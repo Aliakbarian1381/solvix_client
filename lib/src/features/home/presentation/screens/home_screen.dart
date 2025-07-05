@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -28,6 +29,7 @@ import 'package:solvix/src/features/settings/presentation/screens/settings_scree
 import 'package:solvix/src/features/new_chat/presentation/screens/create_group_screen.dart';
 import 'package:solvix/src/features/contacts/presentation/screens/contacts_screen.dart';
 import 'package:solvix/src/core/network/notification_service.dart';
+import '../../../../core/network/connection_status/connection_status_bloc.dart';
 import '../../../../core/utils/date_helper.dart';
 import '../../../contacts/presentation/bloc/contacts_bloc.dart';
 
@@ -853,67 +855,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     bool isDesktop,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userName =
+        _currentUser?.firstName ?? _currentUser?.username ?? 'Solvix';
 
     return AppBar(
-      title: AnimatedBuilder(
-        animation: _appBarAnimationController,
-        builder: (context, child) {
-          return SlideTransition(
-            position:
-                Tween<Offset>(
-                  begin: const Offset(-0.2, 0),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(
-                    parent: _appBarAnimationController,
-                    curve: Curves.easeOutCubic,
+      title: BlocBuilder<ConnectionStatusBloc, ConnectionStatusState>(
+        builder: (context, state) {
+          String titleText = userName;
+          Color titleColor = isDark ? Colors.white : Colors.black87;
+          IconData? titleIcon;
+
+          if (state.signalRStatus != SignalRConnectionStatus.Connected) {
+            if (state.connectivityStatus == ConnectivityResult.none) {
+              titleText = "آفلاین";
+              titleColor = Colors.grey.shade500;
+              titleIcon = Icons.cloud_off_rounded;
+            } else {
+              titleText = "در حال اتصال...";
+              titleColor = Colors.orange.shade600;
+              titleIcon = Icons.sync_rounded;
+            }
+          }
+
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, -0.2),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: Row(
+              key: ValueKey<String>(titleText),
+              children: [
+                if (titleIcon != null)
+                  Icon(titleIcon, color: titleColor, size: isDesktop ? 20 : 18),
+                if (titleIcon != null) const SizedBox(width: 8),
+                Text(
+                  titleText,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: isDesktop ? 22 : 19,
+                    color: titleColor,
                   ),
                 ),
-            child: FadeTransition(
-              opacity: _appBarAnimationController,
-              child: Row(
-                children: [
-                  if (!_isConnected)
-                    AnimatedBuilder(
-                      animation: _connectionController,
-                      builder: (context, child) {
-                        return Transform.rotate(
-                          angle: _connectionController.value * 2 * 3.14159,
-                          child: Container(
-                            margin: EdgeInsets.only(left: isDesktop ? 12 : 8),
-                            child: Icon(
-                              Icons.sync,
-                              color: Colors.orange,
-                              size: isDesktop ? 20 : 18,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  if (_isUpdating && _isConnected)
-                    Container(
-                      margin: EdgeInsets.only(left: isDesktop ? 12 : 8),
-                      width: isDesktop ? 16 : 14,
-                      height: isDesktop ? 16 : 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                  Text(
-                    _getAppBarTitle(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: isDesktop ? 22 : 19,
-                      color: !_isConnected
-                          ? Colors.orange
-                          : _isUpdating
-                          ? Theme.of(context).primaryColor
-                          : (isDark ? Colors.white : Colors.black87),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           );
         },

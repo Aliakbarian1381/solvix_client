@@ -14,6 +14,7 @@ import 'package:solvix/src/core/models/chat_model.dart';
 import 'package:solvix/src/core/models/client_message_status.dart';
 import 'package:solvix/src/core/models/message_model.dart';
 import 'package:solvix/src/core/models/user_model.dart';
+import 'package:solvix/src/core/network/connection_status/connection_status_bloc.dart';
 import 'package:solvix/src/core/network/notification_service.dart';
 import 'package:solvix/src/core/network/signalr_service.dart';
 import 'package:solvix/src/core/services/storage_service.dart';
@@ -83,6 +84,10 @@ Future<void> main() async {
           BlocProvider.value(value: chatListBloc),
           BlocProvider.value(value: contactsBloc),
           BlocProvider<ThemeCubit>(create: (context) => ThemeCubit()),
+          BlocProvider<ConnectionStatusBloc>(
+            create: (context) => ConnectionStatusBloc(context.read<SignalRService>()),
+            lazy: false,
+          ),
           BlocProvider<AppBloc>(
             create: (context) => AppBloc(
               context.read<StorageService>(),

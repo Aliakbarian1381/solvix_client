@@ -8,6 +8,8 @@ import '../models/client_message_status.dart';
 
 const String _hubUrl = "https://api.solvix.ir/chathub";
 
+enum SignalRConnectionStatus { Connected, Disconnected, Reconnecting }
+
 class MessageConfirmation {
   final String correlationId;
   final MessageModel confirmedMessage;
@@ -24,12 +26,18 @@ class SignalRService {
   final Logger _logger = Logger('SignalRService');
   Completer<void>? _connectionCompleter;
 
+  final _connectionStatusController =
+      StreamController<SignalRConnectionStatus>.broadcast();
+
   final _newMessageReceivedController =
       StreamController<MessageModel>.broadcast();
 
   final _messageUpdatedController = StreamController<MessageModel>.broadcast();
 
   Stream<MessageModel> get onMessageUpdated => _messageUpdatedController.stream;
+
+  Stream<SignalRConnectionStatus> get connectionStatusStream =>
+      _connectionStatusController.stream;
 
   Stream<MessageModel> get onNewMessageReceived =>
       _newMessageReceivedController.stream;
@@ -74,6 +82,7 @@ class SignalRService {
   Future<void> connect() async {
     if (isConnected) {
       _logger.info('SignalR connection already established.');
+      _connectionStatusController.add(SignalRConnectionStatus.Connected);
       return;
     }
 
@@ -92,20 +101,34 @@ class SignalRService {
                   _logger.fine('SignalR Internal Log: $message'),
             ),
           )
-          .withAutomaticReconnect()
+          .withAutomaticReconnect([0, 2000, 4000, 6000, 8000, 10000])
           .build();
 
       _hubConnection!.onclose((error) {
         _logger.warning('SignalR connection closed. Error: $error');
+        _connectionStatusController.add(SignalRConnectionStatus.Disconnected);
       });
 
+      _hubConnection!.onreconnecting((error) {
+        _logger.info('SignalR is reconnecting...');
+        _connectionStatusController.add(SignalRConnectionStatus.Reconnecting);
+      });
+
+      _hubConnection!.onreconnected((connectionId) {
+        _logger.info('SignalR has reconnected successfully.');
+        _connectionStatusController.add(SignalRConnectionStatus.Connected);
+      });
+
+      _connectionStatusController.add(SignalRConnectionStatus.Reconnecting);
       await _hubConnection!.start();
 
       _logger.info('SignalR connection established successfully.');
+      _connectionStatusController.add(SignalRConnectionStatus.Connected);
 
       _registerServerToClientEventHandlers();
     } catch (e) {
       _logger.severe('Failed to connect to SignalR: $e');
+      _connectionStatusController.add(SignalRConnectionStatus.Disconnected);
       await disconnect();
       throw Exception('Failed to establish SignalR connection: $e');
     }
@@ -122,7 +145,8 @@ class SignalRService {
       await _hubConnection!.stop();
       _hubConnection = null;
     }
-    _connectionCompleter = null; // همیشه ریست شود
+    _connectionStatusController.add(SignalRConnectionStatus.Disconnected);
+    _connectionCompleter = null;
     _logger.info('SignalR connection has been disconnected.');
   }
 
@@ -316,6 +340,7 @@ class SignalRService {
 
   void dispose() {
     _logger.info('SignalRService disposing...');
+    _connectionStatusController.close();
     _newMessageReceivedController.close();
     _messageConfirmationController.close();
     _userStatusChangedController.close();

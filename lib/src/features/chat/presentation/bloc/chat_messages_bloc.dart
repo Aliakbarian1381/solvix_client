@@ -132,7 +132,7 @@ class ChatMessagesBloc extends Bloc<ChatMessagesEvent, ChatMessagesState> {
       final tempMessage = MessageModel(
         id: tempId,
         content: event.content,
-        sentAt: DateTime.now().toUtc(),
+        sentAt: DateTime.now(),
         senderId: currentUserId,
         senderName: "شما",
         chatId: chatId,
@@ -183,21 +183,36 @@ class ChatMessagesBloc extends Bloc<ChatMessagesEvent, ChatMessagesState> {
         clientStatus: ClientMessageStatus.sent,
       );
 
-      final tempMessageId = currentState.messages
-          .firstWhere(
-            (m) => m.correlationId == correlationId,
-            orElse: () => confirmedMessage,
-          )
-          .id;
-      if (tempMessageId < 0) {
-        await _messagesBox.delete(tempMessageId);
+      // ۱. پیام موقت را با correlationId در state فعلی پیدا کن
+      MessageModel? tempMessage;
+      try {
+        tempMessage = currentState.messages.firstWhere(
+          (m) => m.correlationId == correlationId,
+        );
+      } catch (e) {
+        tempMessage = null;
       }
 
+      // ۲. اگر پیام موقت پیدا شد، آن را از Hive پاک کن
+      if (tempMessage != null) {
+        await _messagesBox.delete(tempMessage.id);
+      }
+
+      // ۳. پیام نهایی و تایید شده را در Hive ذخیره کن
       await _messagesBox.put(confirmedMessage.id, confirmedMessage);
 
-      final updatedMessages = currentState.messages.map((msg) {
-        return msg.correlationId == correlationId ? confirmedMessage : msg;
-      }).toList();
+      // ۴. لیست پیام‌ها را برای نمایش در UI به‌روز کن
+      // ابتدا همه پیام‌های بدون correlationId مورد نظر را نگه دار
+      final updatedMessages = currentState.messages
+          .where((msg) => msg.correlationId != correlationId)
+          .toList();
+
+      // سپس پیام تایید شده را به لیست اضافه کن
+      updatedMessages.add(confirmedMessage);
+
+      // لیست را مجددا مرتب کن تا پیام‌ها به ترتیب زمان باشند
+      updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+
       emit(ChatMessagesLoaded(updatedMessages));
     }
   }
