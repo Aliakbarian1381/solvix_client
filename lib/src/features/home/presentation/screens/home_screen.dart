@@ -46,10 +46,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late List<Widget> _widgetOptions;
   late AnimationController _appBarAnimationController;
   late AnimationController _fabAnimationController;
+  late AnimationController _connectionController;
 
   bool _isSearching = false;
   final _searchController = TextEditingController();
   late final SearchBloc _searchBloc;
+
+  // Connection states
+  bool _isConnected = true;
+  bool _isUpdating = false;
 
   @override
   void initState() {
@@ -62,10 +67,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
+    _connectionController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
 
     // Start animations
     _appBarAnimationController.forward();
     _fabAnimationController.forward();
+
+    // Simulate connection states (you can replace with real SignalR connection status)
+    _simulateConnectionStates();
+  }
+
+  void _simulateConnectionStates() {
+    // This is just for demonstration - replace with real connection monitoring
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+        });
+        _connectionController.repeat();
+      }
+    });
+
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _isConnected = true;
+          _isUpdating = true;
+        });
+        _connectionController.stop();
+        _connectionController.reset();
+      }
+    });
+
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted) {
+        setState(() {
+          _isUpdating = false;
+        });
+      }
+    });
   }
 
   @override
@@ -102,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void dispose() {
     _appBarAnimationController.dispose();
     _fabAnimationController.dispose();
+    _connectionController.dispose();
     _searchController.dispose();
     _searchBloc.close();
     super.dispose();
@@ -127,6 +171,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _currentUser?.firstName ?? _currentUser?.username ?? 'سالویکس';
     switch (_selectedIndex) {
       case 0:
+        if (!_isConnected) return 'درحال اتصال...';
+        if (_isUpdating) return 'درحال بروزرسانی...';
         return userName;
       case 1:
         return 'مخاطبین';
@@ -246,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             width: 90,
             height: 90,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -291,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         content: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(6),
@@ -302,12 +348,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 size: 16,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 message,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -315,6 +361,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
         ),
         backgroundColor: const Color(0xFFE53E3E),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        elevation: 0,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSuccessToast(String message) {
+    // استفاده از toast سفارشی با styling درست
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(
+                Icons.check_circle_outline_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF22C55E),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -334,13 +420,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 600;
+    final isDesktop = screenWidth > 800; // افزایش threshold برای desktop
+
+    // اگر desktop است، layout متفاوت نمایش بده
+    if (isDesktop) {
+      return _buildDesktopLayout();
+    }
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFFFFFFF),
+          ? const Color(0xFF0B1426)
+          : const Color(0xFFF7F8FC),
       appBar: _isSearching
           ? _buildSearchAppBar(context, isDesktop)
           : _buildDefaultAppBar(context, isDesktop),
@@ -349,61 +440,376 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           : _buildPrimaryContent(context, isDesktop),
       bottomNavigationBar: _isSearching
           ? null
-          : _buildTelegramBottomNavBar(context, isDesktop),
+          : _buildModernBottomNavBar(context, isDesktop),
       floatingActionButton: (_isSearching || _selectedIndex != 0)
           ? null
-          : _buildTelegramFAB(context, isDesktop),
+          : _buildModernFAB(context, isDesktop),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark
+          ? const Color(0xFF0B1426)
+          : const Color(0xFFF7F8FC),
+      body: Row(
+        children: [
+          // Side Panel
+          Container(
+            width: 320,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              border: Border(
+                left: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Profile Avatar
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).primaryColor.withOpacity(0.2),
+                              Theme.of(context).primaryColor.withOpacity(0.1),
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _currentUser?.firstName
+                                    ?.substring(0, 1)
+                                    .toUpperCase() ??
+                                'U',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _getAppBarTitle(),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            if (!_isConnected || _isUpdating)
+                              Text(
+                                !_isConnected
+                                    ? 'درحال اتصال...'
+                                    : 'درحال بروزرسانی...',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: !_isConnected
+                                      ? Colors.orange
+                                      : Theme.of(context).primaryColor,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Search button
+                      _buildDesktopSearchButton(),
+                    ],
+                  ),
+                ),
+                // Navigation
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      _buildDesktopNavItem(
+                        0,
+                        Icons.chat_bubble_rounded,
+                        'چت‌ها',
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDesktopNavItem(1, Icons.people_rounded, 'مخاطبین'),
+                      const SizedBox(width: 8),
+                      _buildDesktopNavItem(
+                        2,
+                        Icons.settings_rounded,
+                        'تنظیمات',
+                      ),
+                    ],
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: _isSearching
+                      ? _buildSearchResults(true)
+                      : _buildPrimaryContent(context, true),
+                ),
+              ],
+            ),
+          ),
+          // Main Content Area
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF8FAFC),
+              ),
+              child: Column(
+                children: [
+                  // Top bar
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'انتخاب چت برای شروع مکالمه',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (_selectedIndex == 0) _buildDesktopNewChatButton(),
+                      ],
+                    ),
+                  ),
+                  // Welcome message
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 60,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'از چپ یک چت انتخاب کنید',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'یا گفتگوی جدید شروع کنید',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isDark ? Colors.white54 : Colors.black45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopSearchButton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.search, color: Colors.white, size: 20),
+        onPressed: _toggleSearch,
+      ),
+    );
+  }
+
+  Widget _buildDesktopNavItem(int index, IconData icon, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSelected = _selectedIndex == index;
+
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _onItemTapped(index),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? Theme.of(context).primaryColor.withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: isSelected
+                  ? Border.all(
+                      color: Theme.of(context).primaryColor.withOpacity(0.2),
+                    )
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: isSelected
+                      ? Theme.of(context).primaryColor
+                      : (isDark ? Colors.white54 : Colors.black54),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : (isDark ? Colors.white54 : Colors.black54),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopNewChatButton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+        onPressed: () {
+          if (_currentUser == null) return;
+          _showNewConversationModal(context, true);
+        },
+      ),
     );
   }
 
   Widget _buildLoadingScreen() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 600;
+    final isDesktop = screenWidth > 800;
 
     return Scaffold(
       backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFFFFFFF),
+          ? const Color(0xFF0B1426)
+          : const Color(0xFFF7F8FC),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: isDesktop ? 64 : 56,
-              height: isDesktop ? 64 : 56,
+              width: isDesktop ? 80 : 64,
+              height: isDesktop ? 80 : 64,
               decoration: BoxDecoration(
                 color: Theme.of(context).primaryColor,
-                borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+                borderRadius: BorderRadius.circular(isDesktop ? 20 : 16),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(context).primaryColor.withOpacity(0.2),
-                    blurRadius: isDesktop ? 12 : 10,
-                    offset: const Offset(0, 4),
+                    color: Theme.of(context).primaryColor.withOpacity(0.25),
+                    blurRadius: isDesktop ? 20 : 16,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: Center(
-                child: SizedBox(
-                  width: isDesktop ? 28 : 24,
-                  height: isDesktop ? 28 : 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: isDesktop ? 2.5 : 2,
-                  ),
-                ),
+              child: Icon(
+                Icons.chat_bubble_rounded,
+                color: Colors.white,
+                size: isDesktop ? 40 : 32,
               ),
             ).animate().scale(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOutBack,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.elasticOut,
             ),
-            SizedBox(height: isDesktop ? 24 : 20),
+            SizedBox(height: isDesktop ? 32 : 24),
             Text(
               'در حال بارگذاری...',
               style: TextStyle(
                 color: isDark ? Colors.white70 : Colors.black54,
-                fontSize: isDesktop ? 16 : 14,
+                fontSize: isDesktop ? 18 : 16,
                 fontWeight: FontWeight.w500,
               ),
             ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
@@ -415,14 +821,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildPrimaryContent(BuildContext context, bool isDesktop) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 350),
       transitionBuilder: (Widget child, Animation<double> animation) {
         return FadeTransition(
           opacity: animation,
           child: SlideTransition(
             position:
                 Tween<Offset>(
-                  begin: const Offset(0.0, 0.02),
+                  begin: const Offset(0.0, 0.1),
                   end: Offset.zero,
                 ).animate(
                   CurvedAnimation(
@@ -465,21 +871,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
             child: FadeTransition(
               opacity: _appBarAnimationController,
-              child: Text(
-                _getAppBarTitle(),
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isDesktop ? 22 : 19,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
+              child: Row(
+                children: [
+                  if (!_isConnected)
+                    AnimatedBuilder(
+                      animation: _connectionController,
+                      builder: (context, child) {
+                        return Transform.rotate(
+                          angle: _connectionController.value * 2 * 3.14159,
+                          child: Container(
+                            margin: EdgeInsets.only(left: isDesktop ? 12 : 8),
+                            child: Icon(
+                              Icons.sync,
+                              color: Colors.orange,
+                              size: isDesktop ? 20 : 18,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  if (_isUpdating && _isConnected)
+                    Container(
+                      margin: EdgeInsets.only(left: isDesktop ? 12 : 8),
+                      width: isDesktop ? 16 : 14,
+                      height: isDesktop ? 16 : 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                  Text(
+                    _getAppBarTitle(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: isDesktop ? 22 : 19,
+                      color: !_isConnected
+                          ? Colors.orange
+                          : _isUpdating
+                          ? Theme.of(context).primaryColor
+                          : (isDark ? Colors.white : Colors.black87),
+                    ),
+                  ),
+                ],
               ),
             ),
           );
         },
       ),
       backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFFFFFFF),
+          ? const Color(0xFF0B1426)
+          : const Color(0xFFF7F8FC),
       elevation: 0,
       scrolledUnderElevation: 0,
       actions: _selectedIndex == 0
@@ -500,19 +941,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
                       ),
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.search,
-                          color: isDark ? Colors.white : Colors.black87,
-                          size: isDesktop ? 24 : 22,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor,
+                          borderRadius: BorderRadius.circular(
+                            isDesktop ? 16 : 14,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withOpacity(0.3),
+                              blurRadius: isDesktop ? 12 : 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        tooltip: 'جستجو',
-                        onPressed: _toggleSearch,
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: isDark
-                              ? Colors.white
-                              : Colors.black87,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.search,
+                            color: Colors.white,
+                            size: isDesktop ? 22 : 20,
+                          ),
+                          tooltip: 'جستجو',
+                          onPressed: _toggleSearch,
                         ),
                       ),
                     );
@@ -529,30 +981,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return AppBar(
       backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFFFFFFF),
+          ? const Color(0xFF0B1426)
+          : const Color(0xFFF7F8FC),
       elevation: 0,
       scrolledUnderElevation: 0,
-      leading: IconButton(
-        icon: Icon(
-          Icons.arrow_back,
-          color: isDark ? Colors.white : Colors.black87,
-          size: isDesktop ? 24 : 22,
+      leading: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF1E293B).withOpacity(0.6)
+              : Colors.white.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
         ),
-        onPressed: _toggleSearch,
+        child: IconButton(
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: isDark ? Colors.white : Colors.black87,
+            size: isDesktop ? 22 : 20,
+          ),
+          onPressed: _toggleSearch,
+        ),
       ).animate().slideX(begin: -0.2, curve: Curves.easeOutCubic),
       title: Container(
-        height: isDesktop ? 44 : 38,
+        height: isDesktop ? 48 : 44,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(isDesktop ? 12 : 10),
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDesktop ? 0.06 : 0.04),
+              blurRadius: isDesktop ? 8 : 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: TextField(
           controller: _searchController,
           autofocus: true,
           style: TextStyle(
             fontSize: isDesktop ? 16 : 15,
-            fontWeight: FontWeight.w400,
+            fontWeight: FontWeight.w500,
             color: isDark ? Colors.white : Colors.black87,
           ),
           decoration: InputDecoration(
@@ -566,26 +1040,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               color: isDark ? Colors.white54 : Colors.black45,
               fontWeight: FontWeight.w400,
             ),
-            prefixIcon: Icon(
-              Icons.search,
-              color: isDark ? Colors.white54 : Colors.black45,
-              size: isDesktop ? 20 : 18,
+            prefixIcon: Container(
+              margin: EdgeInsets.all(isDesktop ? 12 : 10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.search,
+                color: Theme.of(context).primaryColor,
+                size: isDesktop ? 18 : 16,
+              ),
             ),
           ),
         ),
       ).animate().slideY(begin: -0.2, curve: Curves.easeOutCubic),
       actions: [
         if (_searchController.text.isNotEmpty)
-          IconButton(
-            icon: Icon(
-              Icons.clear,
-              color: isDark ? Colors.white54 : Colors.black45,
-              size: isDesktop ? 20 : 18,
+          Container(
+            margin: EdgeInsets.only(left: isDesktop ? 16 : 12, right: 8),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF1E293B).withOpacity(0.6)
+                  : Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
+              ),
             ),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _searchController.clear();
-            },
+            child: IconButton(
+              icon: Icon(
+                Icons.clear_rounded,
+                color: isDark ? Colors.white54 : Colors.black45,
+                size: isDesktop ? 18 : 16,
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _searchController.clear();
+              },
+            ),
           ).animate().scale(curve: Curves.easeOutBack),
       ],
     );
@@ -601,18 +1096,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (ctx) {
         return Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, -5),
               ),
             ],
           ),
           child: Padding(
-            padding: EdgeInsets.all(isDesktop ? 28 : 20),
+            padding: EdgeInsets.all(isDesktop ? 32 : 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,8 +1119,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     height: 4,
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xFF3A3A3A)
-                          : const Color(0xFFE0E0E0),
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -637,8 +1132,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Text(
                   'شروع مکالمه جدید',
                   style: TextStyle(
-                    fontSize: isDesktop ? 20 : 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: isDesktop ? 22 : 20,
+                    fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                 ).animate().slideX(
@@ -646,10 +1141,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   delay: const Duration(milliseconds: 100),
                   curve: Curves.easeOutCubic,
                 ),
-                SizedBox(height: isDesktop ? 20 : 16),
-                _buildTelegramModalOption(
+                SizedBox(height: isDesktop ? 24 : 20),
+                _buildModernModalOption(
                   context,
-                  icon: Icons.group_add,
+                  icon: Icons.person_add_alt_1_rounded,
+                  title: 'پیام خصوصی جدید',
+                  subtitle: 'چت شخصی با یک فرد',
+                  isDesktop: isDesktop,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ContactsScreen()),
+                    );
+                  },
+                ).animate().slideX(
+                  begin: -0.2,
+                  delay: const Duration(milliseconds: 100),
+                  curve: Curves.easeOutCubic,
+                ),
+                SizedBox(height: isDesktop ? 16 : 12),
+                _buildModernModalOption(
+                  context,
+                  icon: Icons.group_add_rounded,
                   title: 'گروه جدید',
                   subtitle: 'ایجاد گروه با چندین نفر',
                   isDesktop: isDesktop,
@@ -670,27 +1184,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   delay: const Duration(milliseconds: 150),
                   curve: Curves.easeOutCubic,
                 ),
-                SizedBox(height: isDesktop ? 12 : 8),
-                _buildTelegramModalOption(
+                SizedBox(height: isDesktop ? 16 : 12),
+                _buildModernModalOption(
                   context,
-                  icon: Icons.campaign,
+                  icon: Icons.campaign_rounded,
                   title: 'کانال جدید',
                   subtitle: 'اطلاع‌رسانی به مخاطبین',
                   isDesktop: isDesktop,
                   onTap: () {
                     Navigator.pop(ctx);
-                    Fluttertoast.showToast(
-                      msg: "کانال جدید به زودی اضافه می‌شود!",
-                      toastLength: Toast.LENGTH_SHORT,
-                      gravity: ToastGravity.BOTTOM,
-                    );
+                    _showSuccessToast("کانال جدید به زودی اضافه می‌شود!");
                   },
                 ).animate().slideX(
                   begin: -0.2,
                   delay: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
                 ),
-                SizedBox(height: isDesktop ? 20 : 16),
+                SizedBox(height: isDesktop ? 24 : 20),
               ],
             ),
           ),
@@ -699,7 +1209,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTelegramModalOption(
+  Widget _buildModernModalOption(
     BuildContext context, {
     required IconData icon,
     required String title,
@@ -709,59 +1219,70 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 16 : 12,
-            vertical: isDesktop ? 14 : 12,
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(isDesktop ? 12 : 10),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(isDesktop ? 12 : 10),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+          child: Padding(
+            padding: EdgeInsets.all(isDesktop ? 20 : 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(isDesktop ? 14 : 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(isDesktop ? 14 : 12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: Theme.of(context).primaryColor,
+                    size: isDesktop ? 24 : 22,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: Theme.of(context).primaryColor,
-                  size: isDesktop ? 24 : 22,
-                ),
-              ),
-              SizedBox(width: isDesktop ? 16 : 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: isDesktop ? 16 : 15,
-                        color: isDark ? Colors.white : Colors.black87,
+                SizedBox(width: isDesktop ? 16 : 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: isDesktop ? 16 : 15,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: isDesktop ? 14 : 13,
-                        color: isDark ? Colors.white60 : Colors.black54,
-                        fontWeight: FontWeight.w400,
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: isDesktop ? 14 : 13,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: isDark ? Colors.white38 : Colors.black38,
+                  size: isDesktop ? 16 : 14,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -772,7 +1293,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      color: isDark ? const Color(0xFF0D1117) : const Color(0xFFFFFFFF),
+      color: isDark ? const Color(0xFF0B1426) : const Color(0xFFF7F8FC),
       child: BlocBuilder<SearchBloc, SearchState>(
         bloc: _searchBloc,
         builder: (context, state) {
@@ -811,13 +1332,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   .toList();
 
               return ListView(
-                padding: EdgeInsets.symmetric(vertical: isDesktop ? 16 : 12),
+                padding: EdgeInsets.symmetric(vertical: isDesktop ? 20 : 16),
                 children: [
                   if (chatResults.isNotEmpty)
                     _buildSearchResultHeader("گفتگوها", isDesktop),
                   ...chatResults.asMap().entries.map(
                     (entry) =>
-                        _TelegramSearchResultItem(
+                        _ModernSearchResultItem(
                           result: entry.value,
                           isDesktop: isDesktop,
                           onTap: () => _handleSearchResultTap(entry.value),
@@ -831,7 +1352,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _buildSearchResultHeader("کاربران", isDesktop),
                   ...userResults.asMap().entries.map(
                     (entry) =>
-                        _TelegramSearchResultItem(
+                        _ModernSearchResultItem(
                           result: entry.value,
                           isDesktop: isDesktop,
                           onTap: () => _handleSearchResultTap(entry.value),
@@ -854,37 +1375,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(isDesktop ? 40 : 30),
+        padding: EdgeInsets.all(isDesktop ? 48 : 40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: isDesktop ? 80 : 70,
-              height: isDesktop ? 80 : 70,
+              width: isDesktop ? 96 : 80,
+              height: isDesktop ? 96 : 80,
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E1E1E)
-                    : const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(isDesktop ? 20 : 18),
+                color: Theme.of(context).primaryColor,
+                borderRadius: BorderRadius.circular(isDesktop ? 24 : 20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).primaryColor.withOpacity(0.25),
+                    blurRadius: isDesktop ? 20 : 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Icon(
-                Icons.search,
-                size: isDesktop ? 40 : 35,
-                color: isDark ? Colors.white24 : Colors.black26,
+                Icons.search_rounded,
+                size: isDesktop ? 48 : 40,
+                color: Colors.white,
               ),
             ).animate().scale(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOutBack,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.elasticOut,
             ),
-            SizedBox(height: isDesktop ? 24 : 20),
+            SizedBox(height: isDesktop ? 32 : 24),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: isDesktop ? 16 : 15,
+                fontSize: isDesktop ? 18 : 16,
                 color: isDark ? Colors.white60 : Colors.black54,
-                fontWeight: FontWeight.w400,
-                height: 1.3,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
               ),
             ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
           ],
@@ -901,33 +1427,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: isDesktop ? 56 : 48,
-            height: isDesktop ? 56 : 48,
+            width: isDesktop ? 64 : 56,
+            height: isDesktop ? 64 : 56,
             decoration: BoxDecoration(
               color: Theme.of(context).primaryColor,
-              borderRadius: BorderRadius.circular(isDesktop ? 14 : 12),
+              borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).primaryColor.withOpacity(0.25),
+                  blurRadius: isDesktop ? 16 : 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Center(
               child: SizedBox(
-                width: isDesktop ? 24 : 20,
-                height: isDesktop ? 24 : 20,
+                width: isDesktop ? 28 : 24,
+                height: isDesktop ? 28 : 24,
                 child: CircularProgressIndicator(
                   color: Colors.white,
-                  strokeWidth: 2,
+                  strokeWidth: 2.5,
                 ),
               ),
             ),
           ).animate().scale(
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeOutBack,
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.elasticOut,
           ),
-          SizedBox(height: isDesktop ? 20 : 16),
+          SizedBox(height: isDesktop ? 24 : 20),
           Text(
             'در حال جستجو...',
             style: TextStyle(
               color: isDark ? Colors.white70 : Colors.black54,
-              fontSize: isDesktop ? 15 : 14,
-              fontWeight: FontWeight.w400,
+              fontSize: isDesktop ? 16 : 15,
+              fontWeight: FontWeight.w500,
             ),
           ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
         ],
@@ -940,14 +1473,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Padding(
       padding: EdgeInsets.only(
-        right: isDesktop ? 20 : 16,
-        top: isDesktop ? 16 : 12,
-        bottom: isDesktop ? 8 : 6,
+        right: isDesktop ? 24 : 20,
+        top: isDesktop ? 20 : 16,
+        bottom: isDesktop ? 12 : 8,
       ),
       child: Text(
         title,
         style: TextStyle(
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
           fontSize: isDesktop ? 16 : 15,
           color: isDark ? Colors.white70 : Colors.black54,
         ),
@@ -955,7 +1488,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTelegramFAB(BuildContext context, bool isDesktop) {
+  Widget _buildModernFAB(BuildContext context, bool isDesktop) {
     return AnimatedBuilder(
       animation: _fabAnimationController,
       builder: (context, child) {
@@ -966,69 +1499,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               curve: const Interval(0.2, 1.0, curve: Curves.easeOutBack),
             ),
           ),
-          child: FloatingActionButton(
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              if (_currentUser == null) return;
-              _showNewConversationModal(context, isDesktop);
-            },
-            backgroundColor: Theme.of(context).primaryColor,
-            foregroundColor: Colors.white,
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(isDesktop ? 20 : 16),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).primaryColor.withOpacity(0.3),
+                  blurRadius: isDesktop ? 16 : 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            child: Icon(Icons.edit, size: isDesktop ? 24 : 22),
+            child: FloatingActionButton(
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                if (_currentUser == null) return;
+                _showNewConversationModal(context, isDesktop);
+              },
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isDesktop ? 20 : 16),
+              ),
+              child: Icon(Icons.edit_rounded, size: isDesktop ? 26 : 24),
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildTelegramBottomNavBar(BuildContext context, bool isDesktop) {
+  Widget _buildModernBottomNavBar(BuildContext context, bool isDesktop) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0D1117) : const Color(0xFFFFFFFF),
+        color: isDark ? const Color(0xFF0B1426) : const Color(0xFFF7F8FC),
         border: Border(
           top: BorderSide(
-            color: isDark ? const Color(0xFF30363D) : const Color(0xFFE1E4E8),
-            width: 0.5,
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+            width: 1,
           ),
         ),
       ),
       child: SafeArea(
         child: Container(
-          height: isDesktop ? 56 : 50,
+          height: isDesktop ? 80 : 70, // کاهش ارتفاع برای جلوگیری از overflow
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 20 : 8,
-            vertical: 2,
+            horizontal: isDesktop ? 24 : 16,
+            vertical: isDesktop ? 8 : 6, // کاهش padding عمودی
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildTelegramNavBarItem(
+              _buildModernNavBarItem(
                 context,
                 0,
-                Icons.chat_bubble_outline,
-                Icons.chat_bubble,
+                Icons.chat_bubble_outline_rounded,
+                Icons.chat_bubble_rounded,
                 'چت‌ها',
                 isDesktop,
               ),
-              _buildTelegramNavBarItem(
+              _buildModernNavBarItem(
                 context,
                 1,
-                Icons.people_outline,
-                Icons.people,
+                Icons.people_outline_rounded,
+                Icons.people_rounded,
                 'مخاطبین',
                 isDesktop,
               ),
-              _buildTelegramNavBarItem(
+              _buildModernNavBarItem(
                 context,
                 2,
                 Icons.settings_outlined,
-                Icons.settings,
+                Icons.settings_rounded,
                 'تنظیمات',
                 isDesktop,
               ),
@@ -1039,7 +1584,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTelegramNavBarItem(
+  Widget _buildModernNavBarItem(
     BuildContext context,
     int index,
     IconData inactiveIcon,
@@ -1056,23 +1601,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _onItemTapped(index),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
+          borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
             padding: EdgeInsets.symmetric(
-              vertical: isDesktop ? 6 : 4,
-              horizontal: isDesktop ? 6 : 2,
+              vertical: isDesktop ? 6 : 4, // کاهش padding عمودی
+              horizontal: isDesktop ? 6 : 4,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? primaryColor.withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  isSelected ? activeIcon : inactiveIcon,
-                  color: isSelected
-                      ? primaryColor
-                      : (isDark ? Colors.white54 : Colors.black45),
-                  size: isDesktop ? 20 : 18,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: EdgeInsets.all(isDesktop ? 4 : 3), // کاهش padding
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? primaryColor.withOpacity(0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(isDesktop ? 8 : 6),
+                  ),
+                  child: Icon(
+                    isSelected ? activeIcon : inactiveIcon,
+                    color: isSelected
+                        ? primaryColor
+                        : (isDark ? Colors.white54 : Colors.black45),
+                    size: isDesktop ? 20 : 18, // کاهش سایز آیکون
+                  ),
                 ),
-                SizedBox(height: isDesktop ? 2 : 1),
+                SizedBox(height: isDesktop ? 2 : 1), // کاهش فاصله
                 Flexible(
                   child: Text(
                     label,
@@ -1080,9 +1643,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       color: isSelected
                           ? primaryColor
                           : (isDark ? Colors.white54 : Colors.black45),
-                      fontSize: isDesktop ? 10 : 9,
+                      fontSize: isDesktop ? 10 : 9, // کاهش سایز متن
                       fontWeight: isSelected
-                          ? FontWeight.w500
+                          ? FontWeight.w600
                           : FontWeight.w400,
                     ),
                     maxLines: 1,
@@ -1100,42 +1663,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildChatListTabContent() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 600;
+    final isDesktop = screenWidth > 800;
 
     if (_currentUser == null) {
       return Center(
         child: Container(
-          padding: EdgeInsets.all(isDesktop ? 40 : 30),
+          padding: EdgeInsets.all(isDesktop ? 48 : 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: isDesktop ? 80 : 70,
-                height: isDesktop ? 80 : 70,
+                width: isDesktop ? 96 : 80,
+                height: isDesktop ? 96 : 80,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E1E1E)
-                      : const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(isDesktop ? 20 : 18),
+                  color: Colors.red.shade400,
+                  borderRadius: BorderRadius.circular(isDesktop ? 24 : 20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.shade400.withOpacity(0.25),
+                      blurRadius: isDesktop ? 20 : 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Icon(
-                  Icons.error_outline,
-                  size: isDesktop ? 40 : 35,
-                  color: Colors.red.shade400,
+                  Icons.error_outline_rounded,
+                  size: isDesktop ? 48 : 40,
+                  color: Colors.white,
                 ),
               ).animate().scale(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutBack,
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.elasticOut,
               ),
-              SizedBox(height: isDesktop ? 24 : 20),
+              SizedBox(height: isDesktop ? 32 : 24),
               Text(
                 "خطا: اطلاعات کاربر برای نمایش چت‌ها در دسترس نیست.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: isDesktop ? 16 : 15,
+                  fontSize: isDesktop ? 18 : 16,
                   color: isDark ? Colors.white60 : Colors.black54,
-                  fontWeight: FontWeight.w400,
-                  height: 1.3,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
                 ),
               ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
             ],
@@ -1152,33 +1720,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: isDesktop ? 56 : 48,
-                  height: isDesktop ? 56 : 48,
+                  width: isDesktop ? 64 : 56,
+                  height: isDesktop ? 64 : 56,
                   decoration: BoxDecoration(
                     color: Theme.of(context).primaryColor,
-                    borderRadius: BorderRadius.circular(isDesktop ? 14 : 12),
+                    borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).primaryColor.withOpacity(0.25),
+                        blurRadius: isDesktop ? 16 : 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Center(
                     child: SizedBox(
-                      width: isDesktop ? 24 : 20,
-                      height: isDesktop ? 24 : 20,
+                      width: isDesktop ? 28 : 24,
+                      height: isDesktop ? 28 : 24,
                       child: CircularProgressIndicator(
                         color: Colors.white,
-                        strokeWidth: 2,
+                        strokeWidth: 2.5,
                       ),
                     ),
                   ),
                 ).animate().scale(
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeOutBack,
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.elasticOut,
                 ),
-                SizedBox(height: isDesktop ? 20 : 16),
+                SizedBox(height: isDesktop ? 24 : 20),
                 Text(
                   'در حال بارگذاری چت‌ها...',
                   style: TextStyle(
                     color: isDark ? Colors.white70 : Colors.black54,
-                    fontSize: isDesktop ? 15 : 14,
-                    fontWeight: FontWeight.w400,
+                    fontSize: isDesktop ? 16 : 15,
+                    fontWeight: FontWeight.w500,
                   ),
                 ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
               ],
@@ -1189,68 +1764,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (chatListState is ChatListLoaded) {
           _isChatListFetchInitiated = true;
           if (chatListState.chats.isEmpty) {
-            return _buildTelegramEmptyChatState(context, isDesktop);
+            return _buildModernEmptyChatState(context, isDesktop);
           }
           return RefreshIndicator(
             color: Theme.of(context).primaryColor,
-            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            strokeWidth: 2,
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            strokeWidth: 2.5,
             onRefresh: () async {
               if (_currentUser != null) {
                 context.read<ChatListBloc>().add(FetchChatList());
               }
             },
-            child: ListView.builder(
+            child: ListView.separated(
               itemCount: chatListState.chats.length,
+              separatorBuilder: (context, index) => Container(
+                margin: EdgeInsets.only(right: isDesktop ? 88 : 80),
+                child: Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
               itemBuilder: (context, index) {
                 final chat = chatListState.chats[index];
-                return Column(
-                  children: [
-                    _TelegramChatListItem(
-                      chat: chat,
-                      currentUser: _currentUser,
-                      isDesktop: isDesktop,
-                      onTap: () async {
-                        if (_currentUser == null) return;
-                        HapticFeedback.selectionClick();
-                        final chatListBlocInstance = context
-                            .read<ChatListBloc>();
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (newNavContext) => BlocProvider(
-                              create: (blocContext) => ChatMessagesBloc(
-                                blocContext.read<ChatService>(),
-                                blocContext.read<SignalRService>(),
-                                chatId: chat.id,
-                                currentUserId: _currentUser!.id,
-                              ),
-                              child: ChatScreen(
-                                chatModel: chat,
-                                currentUser: _currentUser,
-                              ),
-                            ),
+                return _ModernChatListItem(
+                  chat: chat,
+                  currentUser: _currentUser,
+                  isDesktop: isDesktop,
+                  onTap: () async {
+                    if (_currentUser == null) return;
+                    HapticFeedback.selectionClick();
+                    final chatListBlocInstance = context.read<ChatListBloc>();
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (newNavContext) => BlocProvider(
+                          create: (blocContext) => ChatMessagesBloc(
+                            blocContext.read<ChatService>(),
+                            blocContext.read<SignalRService>(),
+                            chatId: chat.id,
+                            currentUserId: _currentUser!.id,
                           ),
-                        );
-                        chatListBlocInstance.add(FetchChatList());
-                      },
-                    ).animate().slideX(
-                      begin: -0.05,
-                      delay: Duration(milliseconds: index * 30),
-                      curve: Curves.easeOutCubic,
-                    ),
-                    if (index < chatListState.chats.length - 1)
-                      Container(
-                        margin: EdgeInsets.only(right: isDesktop ? 76 : 68),
-                        child: Divider(
-                          height: 1,
-                          thickness: 0.3,
-                          color: isDark
-                              ? const Color(0xFF30363D)
-                              : const Color(0xFFE1E4E8),
+                          child: ChatScreen(
+                            chatModel: chat,
+                            currentUser: _currentUser,
+                          ),
                         ),
                       ),
-                  ],
+                    );
+                    chatListBlocInstance.add(FetchChatList());
+                  },
+                ).animate().slideX(
+                  begin: -0.05,
+                  delay: Duration(milliseconds: index * 50),
+                  curve: Curves.easeOutCubic,
                 );
               },
             ),
@@ -1261,78 +1830,87 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _isChatListFetchInitiated = true;
           return Center(
             child: Container(
-              padding: EdgeInsets.all(isDesktop ? 40 : 30),
+              padding: EdgeInsets.all(isDesktop ? 48 : 40),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: isDesktop ? 80 : 70,
-                    height: isDesktop ? 80 : 70,
+                    width: isDesktop ? 96 : 80,
+                    height: isDesktop ? 96 : 80,
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1E1E1E)
-                          : const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(isDesktop ? 20 : 18),
+                      color: Colors.red.shade400,
+                      borderRadius: BorderRadius.circular(isDesktop ? 24 : 20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.shade400.withOpacity(0.25),
+                          blurRadius: isDesktop ? 20 : 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
                     child: Icon(
-                      Icons.error_outline,
-                      size: isDesktop ? 40 : 35,
-                      color: Colors.red.shade400,
+                      Icons.error_outline_rounded,
+                      size: isDesktop ? 48 : 40,
+                      color: Colors.white,
                     ),
                   ).animate().scale(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOutBack,
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.elasticOut,
                   ),
-                  SizedBox(height: isDesktop ? 24 : 20),
+                  SizedBox(height: isDesktop ? 32 : 24),
                   Text(
                     'خطا در دریافت لیست گفتگوها',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: isDesktop ? 18 : 16,
-                      fontWeight: FontWeight.w500,
+                      fontSize: isDesktop ? 20 : 18,
+                      fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white : Colors.black87,
                     ),
                   ).animate().fadeIn(delay: const Duration(milliseconds: 150)),
-                  SizedBox(height: isDesktop ? 8 : 6),
+                  SizedBox(height: isDesktop ? 12 : 8),
                   Text(
                     chatListState.message,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: isDesktop ? 14 : 13,
+                      fontSize: isDesktop ? 16 : 14,
                       color: isDark ? Colors.white60 : Colors.black54,
-                      height: 1.3,
+                      height: 1.4,
                     ),
                   ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
-                  SizedBox(height: isDesktop ? 24 : 20),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isDesktop ? 24 : 20,
-                        vertical: isDesktop ? 12 : 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          isDesktop ? 12 : 10,
+                  SizedBox(height: isDesktop ? 32 : 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: isDesktop ? 56 : 52,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            isDesktop ? 16 : 14,
+                          ),
                         ),
                       ),
-                      elevation: 0,
-                    ),
-                    icon: Icon(Icons.refresh, size: isDesktop ? 20 : 18),
-                    label: Text(
-                      'تلاش مجدد',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: isDesktop ? 14 : 13,
+                      icon: Icon(
+                        Icons.refresh_rounded,
+                        size: isDesktop ? 22 : 20,
                       ),
+                      label: Text(
+                        'تلاش مجدد',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: isDesktop ? 16 : 15,
+                        ),
+                      ),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        if (_currentUser != null) {
+                          context.read<ChatListBloc>().add(FetchChatList());
+                        }
+                      },
                     ),
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      if (_currentUser != null) {
-                        context.read<ChatListBloc>().add(FetchChatList());
-                      }
-                    },
                   ).animate().scale(
                     delay: const Duration(milliseconds: 300),
                     curve: Curves.easeOutBack,
@@ -1346,37 +1924,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (_currentUser == null) {
           return Center(
             child: Container(
-              padding: EdgeInsets.all(isDesktop ? 40 : 30),
+              padding: EdgeInsets.all(isDesktop ? 48 : 40),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: isDesktop ? 80 : 70,
-                    height: isDesktop ? 80 : 70,
+                    width: isDesktop ? 96 : 80,
+                    height: isDesktop ? 96 : 80,
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xFF1E1E1E)
-                          : const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(isDesktop ? 20 : 18),
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(isDesktop ? 24 : 20),
                     ),
                     child: Icon(
                       Icons.person_off_outlined,
-                      size: isDesktop ? 40 : 35,
+                      size: isDesktop ? 48 : 40,
                       color: isDark ? Colors.white24 : Colors.black26,
                     ),
                   ).animate().scale(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOutBack,
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.elasticOut,
                   ),
-                  SizedBox(height: isDesktop ? 24 : 20),
+                  SizedBox(height: isDesktop ? 32 : 24),
                   Text(
                     "اطلاعات کاربر برای نمایش لیست گفتگوها در دسترس نیست.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: isDesktop ? 16 : 15,
+                      fontSize: isDesktop ? 18 : 16,
                       color: isDark ? Colors.white60 : Colors.black54,
-                      fontWeight: FontWeight.w400,
-                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
                     ),
                   ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
                 ],
@@ -1397,33 +1975,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: isDesktop ? 56 : 48,
-                height: isDesktop ? 56 : 48,
+                width: isDesktop ? 64 : 56,
+                height: isDesktop ? 64 : 56,
                 decoration: BoxDecoration(
                   color: Theme.of(context).primaryColor,
-                  borderRadius: BorderRadius.circular(isDesktop ? 14 : 12),
+                  borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).primaryColor.withOpacity(0.25),
+                      blurRadius: isDesktop ? 16 : 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: SizedBox(
-                    width: isDesktop ? 24 : 20,
-                    height: isDesktop ? 24 : 20,
+                    width: isDesktop ? 28 : 24,
+                    height: isDesktop ? 28 : 24,
                     child: CircularProgressIndicator(
                       color: Colors.white,
-                      strokeWidth: 2,
+                      strokeWidth: 2.5,
                     ),
                   ),
                 ),
               ).animate().scale(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutBack,
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.elasticOut,
               ),
-              SizedBox(height: isDesktop ? 20 : 16),
+              SizedBox(height: isDesktop ? 24 : 20),
               Text(
                 'در حال بارگذاری...',
                 style: TextStyle(
                   color: isDark ? Colors.white70 : Colors.black54,
-                  fontSize: isDesktop ? 15 : 14,
-                  fontWeight: FontWeight.w400,
+                  fontSize: isDesktop ? 16 : 15,
+                  fontWeight: FontWeight.w500,
                 ),
               ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
             ],
@@ -1433,13 +2018,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTelegramEmptyChatState(BuildContext context, bool isDesktop) {
+  Widget _buildModernEmptyChatState(BuildContext context, bool isDesktop) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return RefreshIndicator(
       color: Theme.of(context).primaryColor,
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      strokeWidth: 2,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      strokeWidth: 2.5,
       onRefresh: () async {
         if (_currentUser != null) {
           context.read<ChatListBloc>().add(FetchChatList());
@@ -1452,36 +2037,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: Center(
               child: Container(
-                padding: EdgeInsets.all(isDesktop ? 40 : 30),
+                padding: EdgeInsets.all(isDesktop ? 48 : 40),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: isDesktop ? 120 : 100,
-                      height: isDesktop ? 120 : 100,
+                      width: isDesktop ? 140 : 120,
+                      height: isDesktop ? 140 : 120,
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1E1E1E)
-                            : const Color(0xFFF5F5F5),
+                        color: Theme.of(context).primaryColor,
                         borderRadius: BorderRadius.circular(
-                          isDesktop ? 30 : 25,
+                          isDesktop ? 35 : 30,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.25),
+                            blurRadius: isDesktop ? 30 : 24,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
                       ),
                       child: Icon(
-                        Icons.forum_outlined,
-                        size: isDesktop ? 60 : 50,
-                        color: isDark ? Colors.white12 : Colors.black12,
+                        Icons.forum_rounded,
+                        size: isDesktop ? 70 : 60,
+                        color: Colors.white,
                       ),
                     ).animate().scale(
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.easeOutBack,
+                      duration: const Duration(milliseconds: 800),
+                      curve: Curves.elasticOut,
                     ),
-                    SizedBox(height: isDesktop ? 32 : 24),
+                    SizedBox(height: isDesktop ? 40 : 32),
                     Text(
                       'هنوز هیچ گفتگویی نداری!',
                       style: TextStyle(
-                        fontSize: isDesktop ? 20 : 18,
-                        fontWeight: FontWeight.w600,
+                        fontSize: isDesktop ? 24 : 20,
+                        fontWeight: FontWeight.w700,
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                     ).animate().slideY(
@@ -1489,31 +2081,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       delay: const Duration(milliseconds: 200),
                       curve: Curves.easeOutCubic,
                     ),
-                    SizedBox(height: isDesktop ? 12 : 8),
+                    SizedBox(height: isDesktop ? 16 : 12),
                     Text(
-                      'برای شروع، روی دکمه + در پایین صفحه ضربه بزن.',
+                      'برای شروع، روی دکمه + در پایین صفحه ضربه بزن\nو با دوستان خود به گفتگو بپردازید.',
                       style: TextStyle(
-                        fontSize: isDesktop ? 16 : 15,
+                        fontSize: isDesktop ? 18 : 16,
                         color: isDark ? Colors.white60 : Colors.black54,
                         fontWeight: FontWeight.w400,
-                        height: 1.4,
+                        height: 1.5,
                       ),
                       textAlign: TextAlign.center,
                     ).animate().fadeIn(
-                      delay: const Duration(milliseconds: 250),
+                      delay: const Duration(milliseconds: 300),
                     ),
-                    SizedBox(height: isDesktop ? 32 : 24),
+                    SizedBox(height: isDesktop ? 40 : 32),
                     Container(
-                      padding: EdgeInsets.all(isDesktop ? 16 : 14),
+                      padding: EdgeInsets.all(isDesktop ? 20 : 16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.08),
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(
-                          isDesktop ? 16 : 14,
+                          isDesktop ? 20 : 16,
                         ),
                         border: Border.all(
                           color: Theme.of(
                             context,
-                          ).primaryColor.withOpacity(0.15),
+                          ).primaryColor.withOpacity(0.2),
                           width: 1,
                         ),
                       ),
@@ -1521,35 +2113,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: EdgeInsets.all(isDesktop ? 6 : 5),
+                            padding: EdgeInsets.all(isDesktop ? 8 : 6),
                             decoration: BoxDecoration(
                               color: Theme.of(
                                 context,
-                              ).primaryColor.withOpacity(0.1),
+                              ).primaryColor.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(
-                                isDesktop ? 8 : 7,
+                                isDesktop ? 10 : 8,
                               ),
                             ),
                             child: Icon(
-                              Icons.lightbulb_outline,
+                              Icons.lightbulb_outline_rounded,
                               color: Theme.of(context).primaryColor,
-                              size: isDesktop ? 18 : 16,
+                              size: isDesktop ? 20 : 18,
                             ),
                           ),
-                          SizedBox(width: isDesktop ? 10 : 8),
+                          SizedBox(width: isDesktop ? 12 : 10),
                           Text(
                             'با دوستان خود به گفتگو بپردازید',
                             style: TextStyle(
                               color: Theme.of(context).primaryColor,
-                              fontWeight: FontWeight.w500,
-                              fontSize: isDesktop ? 14 : 13,
+                              fontWeight: FontWeight.w600,
+                              fontSize: isDesktop ? 16 : 14,
                             ),
                           ),
                         ],
                       ),
                     ).animate().slideY(
                       begin: 0.2,
-                      delay: const Duration(milliseconds: 300),
+                      delay: const Duration(milliseconds: 400),
                       curve: Curves.easeOutCubic,
                     ),
                   ],
@@ -1563,13 +2155,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-class _TelegramChatListItem extends StatelessWidget {
+class _ModernChatListItem extends StatelessWidget {
   final ChatModel chat;
   final UserModel? currentUser;
   final bool isDesktop;
   final VoidCallback onTap;
 
-  const _TelegramChatListItem({
+  const _ModernChatListItem({
     required this.chat,
     required this.currentUser,
     required this.isDesktop,
@@ -1636,6 +2228,43 @@ class _TelegramChatListItem extends StatelessWidget {
     return '${jalaliDate.formatter.d} ${jalaliDate.formatter.mN}';
   }
 
+  bool _isLastMessageFromMe() {
+    // This would normally check the last message sender ID
+    // For now, we'll simulate it randomly
+    return chat.id.hashCode % 2 == 0;
+  }
+
+  Widget _buildMessageStatus() {
+    if (!_isLastMessageFromMe()) return const SizedBox.shrink();
+
+    // Simulate message status (you would get this from your message model)
+    final isDelivered = chat.id.hashCode % 3 != 0;
+    final isRead = chat.id.hashCode % 4 == 0;
+
+    if (isRead) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.done_all_rounded, size: 16, color: Colors.blue.shade400),
+        ],
+      );
+    } else if (isDelivered) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.done_all_rounded, size: 16, color: Colors.grey.shade400),
+        ],
+      );
+    } else {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.done_rounded, size: 16, color: Colors.grey.shade400),
+        ],
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1643,13 +2272,13 @@ class _TelegramChatListItem extends StatelessWidget {
     final otherParticipant = _getOtherParticipant();
 
     return Material(
-      color: isDark ? const Color(0xFF0D1117) : const Color(0xFFFFFFFF),
+      color: isDark ? const Color(0xFF0B1426) : const Color(0xFFF7F8FC),
       child: InkWell(
         onTap: onTap,
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 20 : 16,
-            vertical: isDesktop ? 12 : 10,
+            horizontal: isDesktop ? 24 : 20,
+            vertical: isDesktop ? 16 : 14,
           ),
           child: Row(
             children: [
@@ -1657,45 +2286,52 @@ class _TelegramChatListItem extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: isDesktop ? 60 : 52,
-                    height: isDesktop ? 60 : 52,
+                    width: isDesktop ? 64 : 56,
+                    height: isDesktop ? 64 : 56,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
                         colors: [
-                          theme.primaryColor.withOpacity(0.15),
-                          theme.primaryColor.withOpacity(0.08),
+                          theme.primaryColor.withOpacity(0.2),
+                          theme.primaryColor.withOpacity(0.1),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.primaryColor.withOpacity(0.1),
+                          blurRadius: isDesktop ? 8 : 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Center(
                       child: Text(
                         _getAvatarInitials(),
                         style: TextStyle(
                           color: theme.primaryColor,
-                          fontWeight: FontWeight.w600,
-                          fontSize: isDesktop ? 18 : 16,
+                          fontWeight: FontWeight.w700,
+                          fontSize: isDesktop ? 20 : 18,
                         ),
                       ),
                     ),
                   ),
                   if (otherParticipant != null && otherParticipant.isOnline)
                     Positioned(
-                      bottom: 0,
-                      right: 0,
+                      bottom: 2,
+                      right: 2,
                       child: Container(
-                        width: isDesktop ? 16 : 14,
-                        height: isDesktop ? 16 : 14,
+                        width: isDesktop ? 18 : 16,
+                        height: isDesktop ? 18 : 16,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.green.shade400,
                           border: Border.all(
                             color: isDark
-                                ? const Color(0xFF0D1117)
-                                : const Color(0xFFFFFFFF),
-                            width: 2,
+                                ? const Color(0xFF0B1426)
+                                : const Color(0xFFF7F8FC),
+                            width: 3,
                           ),
                         ),
                       ),
@@ -1710,24 +2346,35 @@ class _TelegramChatListItem extends StatelessWidget {
                     Text(
                       _getChatTitle(),
                       style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: isDesktop ? 16 : 15,
+                        fontWeight: FontWeight.w600,
+                        fontSize: isDesktop ? 17 : 16,
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: isDesktop ? 4 : 3),
-                    Text(
-                      chat.lastMessage?.replaceAll('\n', ' ') ?? 'بدون پیام',
-                      style: TextStyle(
-                        color: isDark ? Colors.white60 : Colors.black54,
-                        fontSize: isDesktop ? 14 : 13,
-                        fontWeight: FontWeight.w400,
-                        height: 1.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    SizedBox(height: isDesktop ? 6 : 4),
+                    Row(
+                      children: [
+                        if (_isLastMessageFromMe()) ...[
+                          _buildMessageStatus(),
+                          const SizedBox(width: 4),
+                        ],
+                        Expanded(
+                          child: Text(
+                            chat.lastMessage?.replaceAll('\n', ' ') ??
+                                'بدون پیام',
+                            style: TextStyle(
+                              color: isDark ? Colors.white60 : Colors.black54,
+                              fontSize: isDesktop ? 15 : 14,
+                              fontWeight: FontWeight.w400,
+                              height: 1.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1742,32 +2389,48 @@ class _TelegramChatListItem extends StatelessWidget {
                       _formatLastMessageTime(chat.lastMessageTime, context),
                       style: TextStyle(
                         color: isDark ? Colors.white54 : Colors.black45,
-                        fontSize: isDesktop ? 12 : 11,
-                        fontWeight: FontWeight.w400,
+                        fontSize: isDesktop ? 13 : 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  SizedBox(height: isDesktop ? 6 : 4),
+                  SizedBox(height: isDesktop ? 8 : 6),
                   if (chat.unreadCount > 0)
                     Container(
+                      constraints: BoxConstraints(
+                        minWidth: isDesktop ? 24 : 20,
+                        minHeight: isDesktop ? 24 : 20,
+                      ),
                       padding: EdgeInsets.symmetric(
-                        horizontal: isDesktop ? 6 : 5,
-                        vertical: isDesktop ? 3 : 2,
+                        horizontal: isDesktop ? 8 : 6,
+                        vertical: isDesktop ? 4 : 2,
                       ),
                       decoration: BoxDecoration(
                         color: theme.primaryColor,
-                        borderRadius: BorderRadius.circular(isDesktop ? 10 : 8),
+                        borderRadius: BorderRadius.circular(
+                          isDesktop ? 12 : 10,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.primaryColor.withOpacity(0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Text(
-                        chat.unreadCount.toString(),
+                        chat.unreadCount > 99
+                            ? '99+'
+                            : chat.unreadCount.toString(),
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: isDesktop ? 11 : 10,
-                          fontWeight: FontWeight.w600,
+                          fontSize: isDesktop ? 12 : 11,
+                          fontWeight: FontWeight.w700,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     )
                   else
-                    SizedBox(height: isDesktop ? 20 : 16),
+                    SizedBox(height: isDesktop ? 24 : 20),
                 ],
               ),
             ],
@@ -1778,12 +2441,12 @@ class _TelegramChatListItem extends StatelessWidget {
   }
 }
 
-class _TelegramSearchResultItem extends StatelessWidget {
+class _ModernSearchResultItem extends StatelessWidget {
   final SearchResultModel result;
   final bool isDesktop;
   final VoidCallback onTap;
 
-  const _TelegramSearchResultItem({
+  const _ModernSearchResultItem({
     required this.result,
     required this.isDesktop,
     required this.onTap,
@@ -1808,86 +2471,115 @@ class _TelegramSearchResultItem extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).primaryColor;
 
-    return Material(
-      color: isDark ? const Color(0xFF0D1117) : const Color(0xFFFFFFFF),
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 20 : 16,
-            vertical: isDesktop ? 12 : 10,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: isDesktop ? 48 : 44,
-                height: isDesktop ? 48 : 44,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      primaryColor.withOpacity(0.15),
-                      primaryColor.withOpacity(0.08),
+    return Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 20 : 16,
+        vertical: isDesktop ? 4 : 2,
+      ),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1E293B).withOpacity(0.3)
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 0.5,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(isDesktop ? 16 : 14),
+          child: Container(
+            padding: EdgeInsets.all(isDesktop ? 16 : 14),
+            child: Row(
+              children: [
+                Container(
+                  width: isDesktop ? 52 : 48,
+                  height: isDesktop ? 52 : 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryColor.withOpacity(0.2),
+                        primaryColor.withOpacity(0.1),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(isDesktop ? 14 : 12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withOpacity(0.1),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(isDesktop ? 12 : 11),
-                ),
-                child: Center(
-                  child: Text(
-                    _getAvatarInitials(),
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: isDesktop ? 16 : 14,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: isDesktop ? 16 : 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      result.title,
+                  child: Center(
+                    child: Text(
+                      _getAvatarInitials(),
                       style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: isDesktop ? 16 : 15,
-                        color: isDark ? Colors.white : Colors.black87,
+                        color: primaryColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: isDesktop ? 18 : 16,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (result.subtitle != null && result.subtitle!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          result.subtitle!,
-                          style: TextStyle(
-                            fontSize: isDesktop ? 14 : 13,
-                            color: isDark ? Colors.white60 : Colors.black54,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-              SizedBox(width: isDesktop ? 12 : 8),
-              Icon(
-                result.type == 'chat'
-                    ? Icons.chat_bubble_outline
-                    : Icons.person_add_alt_1_outlined,
-                color: isDark ? Colors.white38 : Colors.black38,
-                size: isDesktop ? 20 : 18,
-              ),
-            ],
+                SizedBox(width: isDesktop ? 16 : 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        result.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: isDesktop ? 16 : 15,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (result.subtitle != null &&
+                          result.subtitle!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            result.subtitle!,
+                            style: TextStyle(
+                              fontSize: isDesktop ? 14 : 13,
+                              color: isDark ? Colors.white60 : Colors.black54,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: isDesktop ? 12 : 8),
+                Container(
+                  padding: EdgeInsets.all(isDesktop ? 8 : 6),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(isDesktop ? 10 : 8),
+                  ),
+                  child: Icon(
+                    result.type == 'chat'
+                        ? Icons.chat_bubble_outline_rounded
+                        : Icons.person_add_alt_1_outlined,
+                    color: primaryColor,
+                    size: isDesktop ? 18 : 16,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

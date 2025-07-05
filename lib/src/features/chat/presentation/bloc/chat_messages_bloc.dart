@@ -16,6 +16,7 @@ class ChatMessagesBloc extends Bloc<ChatMessagesEvent, ChatMessagesState> {
   final SignalRService _signalRService;
   final String chatId;
   final int currentUserId;
+  int _tempIdCounter = 0;
 
   final Box<MessageModel> _messagesBox = Hive.box<MessageModel>('messages');
 
@@ -126,8 +127,10 @@ class ChatMessagesBloc extends Bloc<ChatMessagesEvent, ChatMessagesState> {
   ) async {
     final currentState = state;
     if (currentState is ChatMessagesLoaded) {
+      final tempId = 0xFFFFFFFF - _tempIdCounter;
+      _tempIdCounter++;
       final tempMessage = MessageModel(
-        id: DateTime.now().millisecondsSinceEpoch + 1000000000,
+        id: tempId,
         content: event.content,
         sentAt: DateTime.now().toUtc(),
         senderId: currentUserId,

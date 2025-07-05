@@ -1058,6 +1058,7 @@ class _OtpVerificationFormState extends State<OtpVerificationForm> {
             fontSize: isDesktop ? 16 : 14,
           ),
           prefixIcon: Container(
+
             margin: EdgeInsets.all(isDesktop ? 16 : 12),
             width: 20,
             height: 20,
