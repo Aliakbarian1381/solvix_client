@@ -22,11 +22,13 @@ import '../../../../utils/date_formatter.dart';
 class ChatScreen extends StatefulWidget {
   final ChatModel chatModel;
   final UserModel? currentUser;
+  final bool isDesktopView;
 
   const ChatScreen({
     super.key,
     required this.chatModel,
     required this.currentUser,
+    this.isDesktopView = false,
   });
 
   @override
@@ -37,6 +39,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _didDeleteMessage = false;
   bool _showScrollToBottomButton = false;
   final ScrollController _scrollController = ScrollController();
+
+  // Track message count to determine when to show scroll button
+  int _messageCount = 0;
+  bool _isNearBottom = true;
 
   @override
   void initState() {
@@ -62,10 +68,20 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _scrollListener() {
     if (_scrollController.hasClients) {
-      final showButton = _scrollController.position.pixels > 200;
-      if (showButton != _showScrollToBottomButton) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+
+      // Consider "near bottom" if within 100 pixels of bottom
+      _isNearBottom = (maxScroll - currentScroll) <= 100;
+
+      // Show scroll button only if:
+      // 1. We have more than 6 messages
+      // 2. We're not near the bottom
+      final shouldShowButton = _messageCount > 6 && !_isNearBottom;
+
+      if (shouldShowButton != _showScrollToBottomButton) {
         setState(() {
-          _showScrollToBottomButton = showButton;
+          _showScrollToBottomButton = shouldShowButton;
         });
       }
     }
@@ -79,7 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (state is ChatMessagesLoaded) {
         final currentUserId = widget.currentUser?.id;
 
-        // پیدا کردن آخرین پیام خونده نشده
+        // Find last unread message
         int? lastUnreadIndex;
         for (int i = state.messages.length - 1; i >= 0; i--) {
           final message = state.messages[i];
@@ -90,14 +106,14 @@ class _ChatScreenState extends State<ChatScreen> {
         }
 
         if (lastUnreadIndex != null) {
-          // اسکرول به آخرین پیام خونده نشده
+          // Scroll to last unread message
           _scrollController.animateTo(
-            lastUnreadIndex * 100.0, // تخمین ارتفاع هر پیام
+            lastUnreadIndex * 100.0,
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,
           );
         } else {
-          // اسکرول به پایین
+          // Scroll to bottom
           _scrollToBottom(animate: true, afterBuild: false);
         }
       }
@@ -154,7 +170,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final currentUserId = widget.currentUser?.id;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 600;
+    final isDesktop = screenWidth > 600 || widget.isDesktopView;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (currentUserId == null) {
@@ -200,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white : Colors.black87,
                   ),
-                ).animate().fadeIn(delay: const Duration(milliseconds: 50)),
+                ).animate().fadeIn(delay: const Duration(milliseconds: 150)),
                 SizedBox(height: isDesktop ? 12 : 8),
                 Text(
                   "اطلاعات کاربر برای نمایش چت یافت نشد.",
@@ -210,7 +226,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: isDark ? Colors.white60 : Colors.black54,
                     fontWeight: FontWeight.w400,
                   ),
-                ).animate().fadeIn(delay: const Duration(milliseconds: 100)),
+                ).animate().fadeIn(delay: const Duration(milliseconds: 250)),
               ],
             ),
           ),
@@ -224,31 +240,39 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: isDark
           ? const Color(0xFF0B1426)
           : const Color(0xFFF7F8FC),
-      appBar: _ModernChatAppBar(
-        otherParticipant: otherParticipant,
-        chatModel: widget.chatModel,
-        isDesktop: isDesktop,
-      ),
+      appBar: widget.isDesktopView
+          ? null
+          : _ModernChatAppBar(
+              otherParticipant: otherParticipant,
+              chatModel: widget.chatModel,
+              isDesktop: isDesktop,
+            ),
       body: Stack(
         children: [
           Column(
             children: [
+              // Desktop header
+              if (widget.isDesktopView)
+                _buildDesktopHeader(otherParticipant, isDesktop, isDark),
+
               Expanded(
                 child: Container(
-                  constraints: isDesktop
+                  constraints: isDesktop && !widget.isDesktopView
                       ? const BoxConstraints(maxWidth: 800)
                       : null,
-                  margin: isDesktop
+                  margin: isDesktop && !widget.isDesktopView
                       ? const EdgeInsets.symmetric(horizontal: 24)
                       : null,
                   child: BlocConsumer<ChatMessagesBloc, ChatMessagesState>(
                     listener: (context, state) {
                       if (state is ChatMessagesLoaded) {
-                        final bool wasAtBottom =
-                            _scrollController.hasClients &&
-                            (_scrollController.position.maxScrollExtent -
-                                    _scrollController.position.pixels) <
-                                100;
+                        // Update message count
+                        setState(() {
+                          _messageCount = state.messages.length;
+                        });
+
+                        final bool wasAtBottom = _isNearBottom;
+
                         if (wasAtBottom ||
                             (state.messages.isNotEmpty &&
                                 state.messages.last.senderId ==
@@ -289,10 +313,21 @@ class _ChatScreenState extends State<ChatScreen> {
                           final bool isMe = message.senderId == currentUserId;
                           chatItemsWithDateSeparators.add(
                             _ModernMessageBubble(
-                              message: message,
-                              isMe: isMe,
-                              isDesktop: isDesktop,
-                            ),
+                                  message: message,
+                                  isMe: isMe,
+                                  isDesktop: isDesktop,
+                                )
+                                .animate()
+                                .slideX(
+                                  begin: isMe ? 0.05 : -0.05,
+                                  duration: const Duration(milliseconds: 400),
+                                  curve: Curves.easeOutCubic,
+                                )
+                                .then()
+                                .fadeIn(
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOut,
+                                ),
                           );
                         }
 
@@ -306,9 +341,6 @@ class _ChatScreenState extends State<ChatScreen> {
                           itemBuilder: (context, index) {
                             return chatItemsWithDateSeparators[index];
                           },
-                        ).animate().fadeIn(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOut,
                         );
                       }
                       if (state is ChatMessagesError) {
@@ -324,10 +356,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               Container(
-                constraints: isDesktop
+                constraints: isDesktop && !widget.isDesktopView
                     ? const BoxConstraints(maxWidth: 800)
                     : null,
-                margin: isDesktop
+                margin: isDesktop && !widget.isDesktopView
                     ? const EdgeInsets.symmetric(horizontal: 24)
                     : null,
                 child: _ModernMessageInput(
@@ -338,7 +370,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ],
           ),
-          // دکمه اسکرول به پایین
+          // Scroll to bottom button
           if (_showScrollToBottomButton)
             Positioned(
               bottom: isDesktop ? 100 : 80,
@@ -378,13 +410,143 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ).animate().scale(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutBack,
                   ),
             ),
         ],
       ),
     );
+  }
+
+  Widget _buildDesktopHeader(
+    UserModel? otherParticipant,
+    bool isDesktop,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).primaryColor.withOpacity(0.2),
+                  Theme.of(context).primaryColor.withOpacity(0.1),
+                ],
+              ),
+            ),
+            child: Center(
+              child: Text(
+                _getChatTitle().substring(0, 1).toUpperCase(),
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getChatTitle(),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                if (otherParticipant != null)
+                  Text(
+                    otherParticipant.isOnline ? 'آنلاین' : 'آفلاین',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          _buildDesktopActionButtons(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopActionButtons(bool isDark) {
+    return Row(
+      children: [
+        _buildDesktopActionButton(Icons.call_rounded, 'تماس صوتی', isDark),
+        const SizedBox(width: 8),
+        _buildDesktopActionButton(
+          Icons.videocam_rounded,
+          'تماس تصویری',
+          isDark,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopActionButton(IconData icon, String tooltip, bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: 20),
+        tooltip: tooltip,
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$tooltip به زودی اضافه خواهد شد.'),
+              backgroundColor: Theme.of(context).primaryColor,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _getChatTitle() {
+    if (widget.chatModel.title != null && widget.chatModel.title!.isNotEmpty) {
+      return widget.chatModel.title!;
+    }
+    final otherParticipant = _getOtherParticipant();
+    if (otherParticipant != null) {
+      return "${otherParticipant.firstName ?? ''} ${otherParticipant.lastName ?? ''}"
+              .trim()
+              .isEmpty
+          ? otherParticipant.username
+          : "${otherParticipant.firstName ?? ''} ${otherParticipant.lastName ?? ''}"
+                .trim();
+    }
+    return "چت";
   }
 
   Widget _buildLoadingState(bool isDesktop, bool isDark) {
@@ -469,7 +631,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 fontWeight: FontWeight.w700,
                 color: isDark ? Colors.white : Colors.black87,
               ),
-            ).animate().fadeIn(delay: const Duration(milliseconds: 50)),
+            ).animate().fadeIn(delay: const Duration(milliseconds: 200)),
             SizedBox(height: isDesktop ? 12 : 8),
             Text(
               'گفتگو را با ارسال پیام شروع کنید و تجربه‌ای فوق‌العاده داشته باشید.',
@@ -480,7 +642,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 fontWeight: FontWeight.w400,
                 height: 1.5,
               ),
-            ).animate().fadeIn(delay: const Duration(milliseconds: 100)),
+            ).animate().fadeIn(delay: const Duration(milliseconds: 300)),
           ],
         ),
       ),
@@ -567,8 +729,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
             ).animate().scale(
-              delay: const Duration(milliseconds: 100),
-              curve: Curves.easeOut,
+              delay: const Duration(milliseconds: 400),
+              curve: Curves.easeOutBack,
             ),
           ],
         ),
@@ -641,40 +803,33 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         Color subtitleColor;
         IconData? subtitleIcon;
 
-        // ۱. ابتدا وضعیت کلی اتصال به سرور (SignalR) را چک می‌کنیم
         if (state.signalRStatus == SignalRConnectionStatus.Connected) {
-          // اگر وصل بودیم، وضعیت آنلاین/آفلاین کاربر را نمایش می‌دهیم
           subtitleText = _getParticipantStatusSubtitle();
           subtitleColor = isDark ? Colors.white60 : Colors.black54;
-          subtitleIcon = null; // آیکونی لازم نیست
+          subtitleIcon = null;
         } else {
-          // ۲. اگر به سرور وصل نبودیم، وضعیت اینترنت دستگاه را چک می‌کنیم
           if (state.connectivityStatus == ConnectivityResult.none) {
-            // اینترنت دستگاه قطع است
             subtitleText = "اتصال برقرار نیست";
             subtitleColor = Colors.red.shade400;
             subtitleIcon = Icons.wifi_off_rounded;
           } else {
-            // اینترنت وصل است، اما در حال اتصال به سرور هستیم
             subtitleText = "در حال بروزرسانی...";
             subtitleColor = Colors.orange.shade600;
             subtitleIcon = Icons.sync_rounded;
           }
         }
 
-        // اگر متنی برای نمایش وجود نداشت، یک ویجت خالی برمی‌گردانیم
         if (subtitleText.isEmpty) {
           return const SizedBox.shrink();
         }
 
-        // ۳. ویجت نهایی که شامل آیکون و متن است
         return AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           transitionBuilder: (child, animation) {
             return FadeTransition(opacity: animation, child: child);
           },
           child: Row(
-            key: ValueKey<String>(subtitleText), // کلید برای انیمیشن صحیح
+            key: ValueKey<String>(subtitleText),
             mainAxisSize: MainAxisSize.min,
             children: [
               if (subtitleIcon != null)
@@ -839,21 +994,18 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     return Container(
       margin: EdgeInsets.symmetric(vertical: isDesktop ? 8 : 6),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: primaryColor,
         borderRadius: BorderRadius.circular(isDesktop ? 16 : 12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDesktop ? 0.06 : 0.04),
+            color: primaryColor.withOpacity(0.3),
             blurRadius: isDesktop ? 8 : 6,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: primaryColor, size: isDesktop ? 20 : 18),
+        icon: Icon(icon, color: Colors.white, size: isDesktop ? 20 : 18),
         onPressed: () {
           HapticFeedback.lightImpact();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -989,13 +1141,11 @@ class _ModernMessageInputState extends State<_ModernMessageInput> {
   void _handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
       if (widget.isDesktop) {
-        // Desktop: Enter sends, Shift+Enter new line
         if (event.logicalKey == LogicalKeyboardKey.enter &&
             !HardwareKeyboard.instance.isShiftPressed) {
           _sendMessage();
         }
       }
-      // Mobile: Enter always adds new line, only send button sends
     }
   }
 
@@ -1027,29 +1177,22 @@ class _ModernMessageInputState extends State<_ModernMessageInput> {
                 Container(
                   margin: EdgeInsets.only(bottom: widget.isDesktop ? 4 : 2),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    color: primaryColor,
                     borderRadius: BorderRadius.circular(
                       widget.isDesktop ? 16 : 14,
                     ),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF334155)
-                          : const Color(0xFFE2E8F0),
-                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(
-                          widget.isDesktop ? 0.06 : 0.04,
-                        ),
+                        color: primaryColor.withOpacity(0.3),
                         blurRadius: widget.isDesktop ? 8 : 6,
-                        offset: const Offset(0, 2),
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: IconButton(
                     icon: Icon(
                       Icons.attach_file_rounded,
-                      color: primaryColor,
+                      color: Colors.white,
                       size: widget.isDesktop ? 20 : 18,
                     ),
                     onPressed: () {
@@ -1288,7 +1431,6 @@ class _ModernMessageBubble extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // دسته کشیدن
                 Container(
                   width: 50,
                   height: 5,
@@ -1300,7 +1442,6 @@ class _ModernMessageBubble extends StatelessWidget {
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
-                // گزینه ویرایش
                 Container(
                   margin: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -1366,7 +1507,6 @@ class _ModernMessageBubble extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // گزینه حذف
                 Container(
                   margin: const EdgeInsets.symmetric(
                     horizontal: 20,
