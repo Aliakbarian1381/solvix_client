@@ -1,143 +1,148 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/core/services/storage_service.dart';
 
-const String _userBaseUrl = "https://api.solvix.ir/api/user";
-
 class UserService {
-  final StorageService _storageService = StorageService();
+  final Dio _dio;
+  final StorageService _storageService;
 
-  // متد برای جستجوی کاربران
-  // GET /api/user/search?query={query}
+  UserService(this._dio, this._storageService);
+
   Future<List<UserModel>> searchUsers(String query) async {
-    final token = await _storageService.getToken();
-    if (token == null) throw Exception('توکن احراز هویت یافت نشد.');
-
-    if (query.isEmpty) return []; // اگر کوئری خالی است، لیست خالی برگردان
-
-    final url = Uri.parse(
-      '$_userBaseUrl/search',
-    ).replace(queryParameters: {'query': query});
     try {
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Authorization': 'Bearer $token',
-        },
+      final response = await _dio.get(
+        '/api/user/search',
+        queryParameters: {'query': query},
       );
 
       if (response.statusCode == 200) {
-        final responseBody = jsonDecode(response.body);
-        // پاسخ این اندپوینت هم داخل فیلد 'data' است
-        final List<dynamic> usersData = responseBody['data'];
-        return usersData
-            .map(
-              (userJson) =>
-                  UserModel.fromJson(userJson as Map<String, dynamic>),
-            )
-            .toList();
-      } else {
-        String errorMessage = 'خطا در جستجوی کاربران';
-        try {
-          final errorBody = jsonDecode(response.body);
-          errorMessage = errorBody['message'] ?? errorMessage;
-        } catch (_) {}
-        throw Exception('$errorMessage (کد: ${response.statusCode})');
+        final List<dynamic> data = response.data;
+        return data.map((json) => UserModel.fromJson(json)).toList();
       }
-    } catch (e) {
-      if (e is Exception && e.toString().contains("خطا")) rethrow;
-      throw Exception('خطای شبکه هنگام جستجوی کاربران: ${e.toString()}');
+      return [];
+    } on DioException catch (e) {
+      throw Exception('خطا در جستجوی کاربران: ${e.message}');
     }
   }
 
   Future<List<UserModel>> syncContacts(List<String> phoneNumbers) async {
-    final token = await _storageService.getToken();
-    if (token == null) throw Exception('توکن یافت نشد.');
-
-    final url = Uri.parse('https://api.solvix.ir/api/user/sync-contacts');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(phoneNumbers),
-    );
-
-    if (response.statusCode == 200) {
-      final List<dynamic> responseBody = jsonDecode(response.body)['data'];
-      return responseBody.map((json) => UserModel.fromJson(json)).toList();
-    } else {
-      throw Exception('خطا در همگام سازی مخاطبین');
-    }
-  }
-
-  // متد برای دریافت کاربران آنلاین
-  // GET /api/user/online
-  Future<List<UserModel>> getOnlineUsers() async {
-    final token = await _storageService.getToken();
-    if (token == null) throw Exception('توکن احراز هویت یافت نشد.');
-
-    final url = Uri.parse('$_userBaseUrl/online');
     try {
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Authorization': 'Bearer $token',
-        },
+      final response = await _dio.post(
+        '/api/user/sync-contacts',
+        data: phoneNumbers,
       );
 
       if (response.statusCode == 200) {
-        final responseBody = jsonDecode(response.body);
-        // پاسخ این اندپوینت هم داخل فیلد 'data' است
-        final List<dynamic> usersData = responseBody['data'];
-        return usersData
-            .map(
-              (userJson) =>
-                  UserModel.fromJson(userJson as Map<String, dynamic>),
-            )
-            .toList();
-      } else {
-        String errorMessage = 'خطا در دریافت کاربران آنلاین';
-        try {
-          final errorBody = jsonDecode(response.body);
-          errorMessage = errorBody['message'] ?? errorMessage;
-        } catch (_) {}
-        throw Exception('$errorMessage (کد: ${response.statusCode})');
+        final List<dynamic> data = response.data;
+        return data.map((json) => UserModel.fromJson(json)).toList();
       }
-    } catch (e) {
-      if (e is Exception && e.toString().contains("خطا")) rethrow;
-      throw Exception('خطای شبکه هنگام دریافت کاربران آنلاین: ${e.toString()}');
+      return [];
+    } on DioException catch (e) {
+      throw Exception('خطا در همگام‌سازی مخاطبین: ${e.message}');
     }
   }
 
-  Future<void> updateFcmToken(String fcmToken) async {
-    final token = await _storageService.getToken();
-    if (token == null) {
-      throw Exception('User not authenticated to update FCM token.');
-    }
-
-    final url = Uri.parse("https://api.solvix.ir/api/user/update-fcm-token");
+  Future<List<UserModel>> getSavedContacts() async {
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'Token': fcmToken}),
+      final response = await _dio.get('/api/user/saved-contacts');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => UserModel.fromJson(json)).toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      throw Exception('خطا در دریافت مخاطبین: ${e.message}');
+    }
+  }
+
+  Future<List<UserModel>> getSavedContactsWithChat() async {
+    try {
+      final response = await _dio.get('/api/user/saved-contacts-with-chat');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => UserModel.fromJson(json)).toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      throw Exception('خطا در دریافت مخاطبین با اطلاعات چت: ${e.message}');
+    }
+  }
+
+  Future<UserModel?> getUserById(int userId) async {
+    try {
+      final response = await _dio.get('/api/user/$userId');
+
+      if (response.statusCode == 200) {
+        return UserModel.fromJson(response.data);
+      }
+      return null;
+    } on DioException catch (e) {
+      throw Exception('خطا در دریافت کاربر: ${e.message}');
+    }
+  }
+
+  Future<List<UserModel>> getOnlineUsers() async {
+    try {
+      final response = await _dio.get('/api/user/online');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => UserModel.fromJson(json)).toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      throw Exception('خطا در دریافت کاربران آنلاین: ${e.message}');
+    }
+  }
+
+  Future<bool> updateFcmToken(String fcmToken) async {
+    try {
+      final response = await _dio.post(
+        '/api/user/update-fcm-token',
+        data: {'token': fcmToken},
       );
 
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Failed to update FCM token on server: ${response.body}',
-        );
-      }
-    } catch (e) {
-      rethrow;
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception('خطا در بروزرسانی FCM Token: ${e.message}');
+    }
+  }
+
+  Future<bool> setContactFavorite(int contactId, bool isFavorite) async {
+    try {
+      final response = await _dio.post(
+        '/api/user/contacts/$contactId/favorite',
+        data: isFavorite,
+      );
+
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception('خطا در تنظیم علاقه‌مندی مخاطب: ${e.message}');
+    }
+  }
+
+  Future<bool> blockContact(int contactId, bool isBlocked) async {
+    try {
+      final response = await _dio.post(
+        '/api/user/contacts/$contactId/block',
+        data: isBlocked,
+      );
+
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception('خطا در مسدود کردن مخاطب: ${e.message}');
+    }
+  }
+
+  Future<bool> updateLastActive() async {
+    try {
+      final response = await _dio.post('/api/user/update-last-active');
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception('خطا در بروزرسانی آخرین فعالیت: ${e.message}');
     }
   }
 }
