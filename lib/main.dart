@@ -116,7 +116,13 @@ Future<void> main() async {
             )..add(AppStarted()),
           ),
         ],
-        child: const App(),
+        child: App(
+          userService: userService,
+          chatService: chatService,
+          searchService: searchService,
+          signalRService: signalRService,
+          notificationService: notificationService,
+        ),
       ),
     ),
   );
