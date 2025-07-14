@@ -61,6 +61,9 @@ class UserModel extends Equatable {
   @HiveField(17)
   final DateTime? lastInteractionAt;
 
+  @HiveField(18)
+  final String? profilePictureUrl;
+
   const UserModel({
     required this.id,
     required this.username,
@@ -80,6 +83,7 @@ class UserModel extends Equatable {
     this.displayName,
     this.contactCreatedAt,
     this.lastInteractionAt,
+    this.profilePictureUrl,
   });
 
   // Computed properties
@@ -128,6 +132,42 @@ class UserModel extends Equatable {
     }
   }
 
+  String get lastInteractionText {
+    if (lastInteractionAt == null) return 'هیچ تعامل قبلی';
+
+    final now = DateTime.now();
+    final difference = now.difference(lastInteractionAt!);
+
+    if (difference.inMinutes < 1) {
+      return 'همین الان';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} دقیقه پیش';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} ساعت پیش';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} روز پیش';
+    } else {
+      return 'مدت زمان زیادی پیش';
+    }
+  }
+
+  String get contactAddedText {
+    if (contactCreatedAt == null) return 'نامشخص';
+
+    final now = DateTime.now();
+    final difference = now.difference(contactCreatedAt!);
+
+    if (difference.inDays < 1) {
+      return 'امروز';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} روز پیش';
+    } else if (difference.inDays < 30) {
+      return '${(difference.inDays / 7).floor()} هفته پیش';
+    } else {
+      return '${(difference.inDays / 30).floor()} ماه پیش';
+    }
+  }
+
   UserModel copyWith({
     int? id,
     String? username,
@@ -147,6 +187,7 @@ class UserModel extends Equatable {
     String? displayName,
     DateTime? contactCreatedAt,
     DateTime? lastInteractionAt,
+    String? profilePictureUrl,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -167,49 +208,53 @@ class UserModel extends Equatable {
       displayName: displayName ?? this.displayName,
       contactCreatedAt: contactCreatedAt ?? this.contactCreatedAt,
       lastInteractionAt: lastInteractionAt ?? this.lastInteractionAt,
+      profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
     );
   }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as int,
-      username: json['username'] as String,
+      username: json['userName'] as String,
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
       phoneNumber: json['phoneNumber'] as String?,
       token: json['token'] as String?,
-      isOnline: json['isOnline'] as bool,
+      isOnline: json['isOnline'] as bool? ?? false,
       lastActive: json['lastActiveAt'] != null
-          ? DateTime.parse(json['lastActiveAt'] as String).toLocal()
+          ? DateTime.parse(json['lastActiveAt'] as String)
           : null,
+      isContact: json['isContact'] as bool?,
       hasChat: json['hasChat'] as bool? ?? false,
       lastMessage: json['lastMessage'] as String?,
       lastMessageTime: json['lastMessageTime'] != null
-          ? DateTime.parse(json['lastMessageTime'] as String).toLocal()
+          ? DateTime.parse(json['lastMessageTime'] as String)
           : null,
       unreadCount: json['unreadCount'] as int? ?? 0,
       isFavorite: json['isFavorite'] as bool? ?? false,
       isBlocked: json['isBlocked'] as bool? ?? false,
       displayName: json['displayName'] as String?,
       contactCreatedAt: json['contactCreatedAt'] != null
-          ? DateTime.parse(json['contactCreatedAt'] as String).toLocal()
+          ? DateTime.parse(json['contactCreatedAt'] as String)
           : null,
       lastInteractionAt: json['lastInteractionAt'] != null
-          ? DateTime.parse(json['lastInteractionAt'] as String).toLocal()
+          ? DateTime.parse(json['lastInteractionAt'] as String)
           : null,
+      profilePictureUrl: json['profilePictureUrl'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'username': username,
+      'userName': username,
       'firstName': firstName,
       'lastName': lastName,
       'phoneNumber': phoneNumber,
       'token': token,
       'isOnline': isOnline,
       'lastActiveAt': lastActive?.toIso8601String(),
+      'isContact': isContact,
       'hasChat': hasChat,
       'lastMessage': lastMessage,
       'lastMessageTime': lastMessageTime?.toIso8601String(),
@@ -219,6 +264,7 @@ class UserModel extends Equatable {
       'displayName': displayName,
       'contactCreatedAt': contactCreatedAt?.toIso8601String(),
       'lastInteractionAt': lastInteractionAt?.toIso8601String(),
+      'profilePictureUrl': profilePictureUrl,
     };
   }
 
@@ -242,5 +288,6 @@ class UserModel extends Equatable {
     displayName,
     contactCreatedAt,
     lastInteractionAt,
+    profilePictureUrl,
   ];
 }

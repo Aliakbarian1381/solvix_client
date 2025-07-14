@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
@@ -9,10 +8,8 @@ import 'package:solvix/src/core/api/chat/chat_service.dart';
 import 'package:solvix/src/core/api/user/user_service.dart';
 import '../../../../core/models/chat_model.dart';
 import '../../../../core/models/user_model.dart';
-
-part 'contacts_event.dart';
-
-part 'contacts_state.dart';
+import 'contacts_event.dart';
+import 'contacts_state.dart';
 
 class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
   final UserService _userService;
@@ -27,7 +24,20 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
     on<ResetChatToOpen>(_onResetChatToOpen);
     on<BackgroundSyncCompleted>(_onBackgroundSyncCompleted);
     on<RefreshContacts>(_onRefreshContacts);
+
+    // متدهای جدید
+    on<SearchContacts>(_onSearchContacts);
+    on<ClearSearchContacts>(_onClearSearchContacts);
+    on<ToggleFavoriteContact>(_onToggleFavoriteContact);
+    on<ToggleBlockContact>(_onToggleBlockContact);
+    on<UpdateContactDisplayName>(_onUpdateContactDisplayName);
+    on<RemoveContact>(_onRemoveContact);
+    on<LoadFavoriteContacts>(_onLoadFavoriteContacts);
+    on<LoadRecentContacts>(_onLoadRecentContacts);
+    on<FilterContacts>(_onFilterContacts);
   }
+
+  // ===== متدهای موجود =====
 
   void _onResetChatToOpen(ResetChatToOpen event, Emitter<ContactsState> emit) {
     emit(state.copyWith(clearChatToOpen: true));
@@ -37,7 +47,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
     ContactsProcessStarted event,
     Emitter<ContactsState> emit,
   ) async {
-    // 1. نمایش فوری کش موجود
+    // نمایش فوری کش موجود
     final cachedContacts = _contactsBox.values.toList();
     if (cachedContacts.isNotEmpty) {
       emit(
@@ -81,7 +91,6 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
     BackgroundSyncCompleted event,
     Emitter<ContactsState> emit,
   ) async {
-    // Background sync کامل شد - اختیاری می‌توان loading indicator حذف کرد
     if (state.status == ContactsStatus.backgroundSyncing) {
       emit(state.copyWith(status: ContactsStatus.success));
     }
@@ -125,6 +134,9 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
     Emitter<ContactsState> emit, {
     required bool isBackgroundSync,
   }) async {
+    // فقط در Mobile اجرا میشه
+    if (kIsWeb) return;
+
     if (!isBackgroundSync) {
       emit(
         state.copyWith(
@@ -138,6 +150,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
     }
 
     try {
+      // خواندن مخاطبین device
       final contacts = await FlutterContacts.getContacts(withProperties: true);
       final phoneNumbers = contacts
           .where((c) => c.phones.isNotEmpty)
@@ -167,6 +180,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
         );
       }
 
+      // ارسال batch به سرور و ذخیره در دیتابیس
       const batchSize = 100;
       final List<UserModel> allSyncedUsers = [];
 
@@ -176,6 +190,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
             : phoneNumbers.length;
         final batch = phoneNumbers.sublist(i, end);
 
+        // این API کال باعث میشه روابط در دیتابیس ذخیره بشن
         final syncedUsersInBatch = await _userService.syncContacts(batch);
         allSyncedUsers.addAll(syncedUsersInBatch);
 
@@ -189,7 +204,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
         }
       }
 
-      // بروزرسانی کش
+      // کش کردن local
       await _contactsBox.clear();
       final contactsMap = {for (var user in allSyncedUsers) user.id: user};
       await _contactsBox.putAll(contactsMap);
@@ -213,6 +228,35 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
     }
   }
 
+  Future<void> _refreshWebContacts(Emitter<ContactsState> emit) async {
+    try {
+      emit(state.copyWith(status: ContactsStatus.refreshing));
+
+      // در Web فقط از سرور refresh کن
+      final refreshedContacts = await _userService.getSavedContactsWithChat();
+
+      // بروزرسانی کش
+      await _contactsBox.clear();
+      final contactsMap = {for (var user in refreshedContacts) user.id: user};
+      await _contactsBox.putAll(contactsMap);
+
+      emit(
+        state.copyWith(
+          status: ContactsStatus.success,
+          syncedContacts: refreshedContacts,
+          lastSyncTime: DateTime.now(),
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          status: ContactsStatus.failure,
+          errorMessage: 'خطا در بروزرسانی: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
   Future<void> _fetchSavedContactsForWeb(
     Emitter<ContactsState> emit, {
     bool isBackground = false,
@@ -222,7 +266,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
         emit(state.copyWith(status: ContactsStatus.loading));
       }
 
-      final savedContacts = await _userService.getSavedContacts();
+      final savedContacts = await _userService.getSavedContactsWithChat();
 
       await _contactsBox.clear();
       final contactsMap = {for (var user in savedContacts) user.id: user};
@@ -252,7 +296,6 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
     Emitter<ContactsState> emit,
   ) async {
     try {
-      // نمایش loading state
       emit(state.copyWith(isStartingChat: true));
 
       final result = await _chatService.startChatWithUser(event.recipient.id);
@@ -269,12 +312,240 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
         unreadCount: 0,
       );
 
+      // به‌روزرسانی آخرین تعامل
+      await _userService.updateLastInteraction(event.recipient.id);
+
       emit(state.copyWith(chatToOpen: chatModel, isStartingChat: false));
     } catch (e) {
       emit(
         state.copyWith(
           isStartingChat: false,
           errorMessage: 'خطا در ایجاد چت: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  // ===== متدهای جدید =====
+
+  Future<void> _onSearchContacts(
+    SearchContacts event,
+    Emitter<ContactsState> emit,
+  ) async {
+    if (event.query.isEmpty) {
+      emit(state.copyWith(searchResults: [], isSearching: false));
+      return;
+    }
+
+    emit(state.copyWith(isSearching: true));
+
+    try {
+      final results = await _userService.searchContacts(event.query);
+      emit(state.copyWith(searchResults: results, isSearching: false));
+    } catch (e) {
+      emit(
+        state.copyWith(
+          isSearching: false,
+          errorMessage: 'خطا در جستجو: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onClearSearchContacts(
+    ClearSearchContacts event,
+    Emitter<ContactsState> emit,
+  ) async {
+    emit(state.copyWith(searchResults: [], isSearching: false));
+  }
+
+  Future<void> _onToggleFavoriteContact(
+    ToggleFavoriteContact event,
+    Emitter<ContactsState> emit,
+  ) async {
+    try {
+      final success = await _userService.toggleFavoriteContact(
+        event.contactId,
+        event.isFavorite,
+      );
+
+      if (success) {
+        // به‌روزرسانی لیست مخاطبین
+        final updatedContacts = state.syncedContacts.map((contact) {
+          if (contact.id == event.contactId) {
+            return contact.copyWith(isFavorite: event.isFavorite);
+          }
+          return contact;
+        }).toList();
+
+        // بروزرسانی کش
+        await _contactsBox.clear();
+        final contactsMap = {for (var user in updatedContacts) user.id: user};
+        await _contactsBox.putAll(contactsMap);
+
+        emit(state.copyWith(syncedContacts: updatedContacts));
+      }
+    } catch (e) {
+      emit(
+        state.copyWith(
+          errorMessage: 'خطا در تغییر وضعیت علاقه‌مندی: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onToggleBlockContact(
+    ToggleBlockContact event,
+    Emitter<ContactsState> emit,
+  ) async {
+    try {
+      final success = await _userService.toggleBlockContact(
+        event.contactId,
+        event.isBlocked,
+      );
+
+      if (success) {
+        // به‌روزرسانی لیست مخاطبین
+        final updatedContacts = state.syncedContacts.map((contact) {
+          if (contact.id == event.contactId) {
+            return contact.copyWith(isBlocked: event.isBlocked);
+          }
+          return contact;
+        }).toList();
+
+        // بروزرسانی کش
+        await _contactsBox.clear();
+        final contactsMap = {for (var user in updatedContacts) user.id: user};
+        await _contactsBox.putAll(contactsMap);
+
+        emit(state.copyWith(syncedContacts: updatedContacts));
+      }
+    } catch (e) {
+      emit(
+        state.copyWith(
+          errorMessage: 'خطا در تغییر وضعیت مسدودیت: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onUpdateContactDisplayName(
+    UpdateContactDisplayName event,
+    Emitter<ContactsState> emit,
+  ) async {
+    try {
+      final success = await _userService.updateContactDisplayName(
+        event.contactId,
+        event.displayName,
+      );
+
+      if (success) {
+        // به‌روزرسانی لیست مخاطبین
+        final updatedContacts = state.syncedContacts.map((contact) {
+          if (contact.id == event.contactId) {
+            return contact.copyWith(displayName: event.displayName);
+          }
+          return contact;
+        }).toList();
+
+        // بروزرسانی کش
+        await _contactsBox.clear();
+        final contactsMap = {for (var user in updatedContacts) user.id: user};
+        await _contactsBox.putAll(contactsMap);
+
+        emit(state.copyWith(syncedContacts: updatedContacts));
+      }
+    } catch (e) {
+      emit(
+        state.copyWith(
+          errorMessage: 'خطا در به‌روزرسانی نام نمایشی: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onRemoveContact(
+    RemoveContact event,
+    Emitter<ContactsState> emit,
+  ) async {
+    try {
+      final success = await _userService.removeContact(event.contactId);
+
+      if (success) {
+        // حذف از لیست مخاطبین
+        final updatedContacts = state.syncedContacts
+            .where((contact) => contact.id != event.contactId)
+            .toList();
+
+        // بروزرسانی کش
+        await _contactsBox.clear();
+        final contactsMap = {for (var user in updatedContacts) user.id: user};
+        await _contactsBox.putAll(contactsMap);
+
+        emit(state.copyWith(syncedContacts: updatedContacts));
+      }
+    } catch (e) {
+      emit(state.copyWith(errorMessage: 'خطا در حذف مخاطب: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onLoadFavoriteContacts(
+    LoadFavoriteContacts event,
+    Emitter<ContactsState> emit,
+  ) async {
+    try {
+      emit(state.copyWith(isLoadingFavorites: true));
+      final favorites = await _userService.getFavoriteContacts();
+      emit(
+        state.copyWith(favoriteContacts: favorites, isLoadingFavorites: false),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          isLoadingFavorites: false,
+          errorMessage: 'خطا در دریافت مخاطبین مورد علاقه: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onLoadRecentContacts(
+    LoadRecentContacts event,
+    Emitter<ContactsState> emit,
+  ) async {
+    try {
+      emit(state.copyWith(isLoadingRecent: true));
+      final recent = await _userService.getRecentContacts();
+      emit(state.copyWith(recentContacts: recent, isLoadingRecent: false));
+    } catch (e) {
+      emit(
+        state.copyWith(
+          isLoadingRecent: false,
+          errorMessage: 'خطا در دریافت مخاطبین اخیر: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onFilterContacts(
+    FilterContacts event,
+    Emitter<ContactsState> emit,
+  ) async {
+    try {
+      emit(state.copyWith(isFiltering: true));
+      final filtered = await _userService.getFilteredContacts(
+        isFavorite: event.isFavorite,
+        isBlocked: event.isBlocked,
+        hasChat: event.hasChat,
+        sortBy: event.sortBy,
+        sortDirection: event.sortDirection,
+      );
+      emit(state.copyWith(filteredContacts: filtered, isFiltering: false));
+    } catch (e) {
+      emit(
+        state.copyWith(
+          isFiltering: false,
+          errorMessage: 'خطا در فیلتر کردن مخاطبین: ${e.toString()}',
         ),
       );
     }
