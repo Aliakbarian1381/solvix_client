@@ -1,3 +1,4 @@
+// lib/src/core/network/signalr_service.dart
 import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:signalr_core/signalr_core.dart';
@@ -6,9 +7,15 @@ import 'package:solvix/src/core/services/storage_service.dart';
 
 import '../models/client_message_status.dart';
 
-const String _hubUrl = "https://api.solvix.ir/chathub";
+// اضافه کردن URL ثابت مثل سایر service ها
+const String _signalRHubUrl = "https://api.solvix.ir/chathub";
 
-enum SignalRConnectionStatus { Connected, Disconnected, Reconnecting }
+enum SignalRConnectionStatus {
+  Disconnected,
+  Connecting,
+  Connected,
+  Reconnecting,
+}
 
 class MessageConfirmation {
   final String correlationId;
@@ -22,66 +29,52 @@ class MessageConfirmation {
 
 class SignalRService {
   HubConnection? _hubConnection;
-  final StorageService _storageService = StorageService();
+  final StorageService _storageService;
   final Logger _logger = Logger('SignalRService');
+
+  final StreamController<SignalRConnectionStatus> _connectionStatusController =
+      StreamController<SignalRConnectionStatus>.broadcast();
+  final StreamController<MessageModel> _newMessageReceivedController =
+      StreamController<MessageModel>.broadcast();
+  final StreamController<MessageModel> _messageUpdatedController =
+      StreamController<MessageModel>.broadcast();
+  final StreamController<MessageConfirmation> _messageConfirmationController =
+      StreamController<MessageConfirmation>.broadcast();
+  final StreamController<Map<String, dynamic>> _userStatusChangedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _messageStatusChangedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _userTypingController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   Completer<void>? _connectionCompleter;
 
-  final _connectionStatusController =
-      StreamController<SignalRConnectionStatus>.broadcast();
+  SignalRService(this._storageService);
 
-  final _newMessageReceivedController =
-      StreamController<MessageModel>.broadcast();
-
-  final _messageUpdatedController = StreamController<MessageModel>.broadcast();
-
-  Stream<MessageModel> get onMessageUpdated => _messageUpdatedController.stream;
-
-  Stream<SignalRConnectionStatus> get connectionStatusStream =>
+  Stream<SignalRConnectionStatus> get connectionStatus =>
       _connectionStatusController.stream;
 
   Stream<MessageModel> get onNewMessageReceived =>
       _newMessageReceivedController.stream;
 
-  final _messageConfirmationController =
-      StreamController<MessageConfirmation>.broadcast();
+  Stream<MessageModel> get onMessageUpdated => _messageUpdatedController.stream;
 
-  Stream<MessageConfirmation> get onMessageConfirmationReceived =>
+  Stream<MessageConfirmation> get onMessageConfirmation =>
       _messageConfirmationController.stream;
-
-  final _userStatusChangedController =
-      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get onUserStatusChanged =>
       _userStatusChangedController.stream;
 
-  final _userTypingController =
-      StreamController<Map<String, dynamic>>.broadcast();
-
-  Stream<Map<String, dynamic>> get onUserTyping => _userTypingController.stream;
-
-  final _messageStatusChangedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-
   Stream<Map<String, dynamic>> get onMessageStatusChanged =>
       _messageStatusChangedController.stream;
 
-  bool get isConnected => _hubConnection?.state == HubConnectionState.connected;
+  Stream<Map<String, dynamic>> get onUserTyping => _userTypingController.stream;
 
-  SignalRService() {
-    Logger.root.level = Level.INFO; // یا Level.FINE برای جزئیات بیشتر
-    Logger.root.onRecord.listen((LogRecord rec) {
-      if (rec.loggerName == 'SignalRService' ||
-          rec.loggerName.startsWith('SignalRClientInternal')) {
-        print(
-          '[${rec.level.name}] ${rec.time.toIso8601String().substring(11, 23)} | ${rec.loggerName} | ${rec.message}',
-        );
-      }
-    });
-  }
+  bool get isConnected => _hubConnection?.state == HubConnectionState.connected;
 
   Future<void> connect() async {
     if (isConnected) {
-      _logger.info('SignalR connection already established.');
+      _logger.info('SignalR already connected');
       _connectionStatusController.add(SignalRConnectionStatus.Connected);
       return;
     }
@@ -93,9 +86,13 @@ class SignalRService {
     }
 
     try {
+      _logger.info(
+        'SignalR: Connecting to $_signalRHubUrl',
+      ); // استفاده از URL ثابت
+
       _hubConnection = HubConnectionBuilder()
           .withUrl(
-            '$_hubUrl?access_token=$token',
+            '$_signalRHubUrl?access_token=$token', // استفاده از URL ثابت
             HttpConnectionOptions(
               logging: (level, message) =>
                   _logger.fine('SignalR Internal Log: $message'),
@@ -303,50 +300,61 @@ class SignalRService {
       );
       _logger.info('SignalR: Message invocation sent for chat $chatIdGuid.');
     } catch (e) {
-      _logger.severe('SignalR: Error invoking SendToChat: $e');
-      rethrow;
+      _logger.severe('SignalR: Error sending message: $e');
+      throw Exception('Failed to send message via SignalR: $e');
     }
   }
 
-  Future<void> markMessageAsRead(int messageId) async {
-    if (!isConnected || _hubConnection == null) return;
+  Future<void> joinChatGroup(String chatId) async {
+    if (!isConnected || _hubConnection == null) {
+      _logger.warning('SignalR: Cannot join group: Not connected.');
+      throw Exception('SignalR not connected');
+    }
     try {
-      await _hubConnection!.invoke('MarkMessageAsRead', args: [messageId]);
+      await _hubConnection!.invoke('JoinGroup', args: [chatId]);
+      _logger.info('SignalR: Joined chat group: $chatId');
     } catch (e) {
-      _logger.severe('SignalR: Error invoking MarkMessageAsRead: $e');
+      _logger.severe('SignalR: Error joining group: $e');
+      throw Exception('Failed to join chat group: $e');
     }
   }
 
-  Future<void> markMultipleMessagesAsRead(List<int> messageIds) async {
-    if (!isConnected || _hubConnection == null) return;
+  Future<void> leaveChatGroup(String chatId) async {
+    if (!isConnected || _hubConnection == null) {
+      _logger.warning('SignalR: Cannot leave group: Not connected.');
+      throw Exception('SignalR not connected');
+    }
     try {
-      await _hubConnection!.invoke(
-        'MarkMultipleMessagesAsRead',
-        args: [messageIds],
-      );
+      await _hubConnection!.invoke('LeaveGroup', args: [chatId]);
+      _logger.info('SignalR: Left chat group: $chatId');
     } catch (e) {
-      _logger.severe('SignalR: Error invoking MarkMultipleMessagesAsRead: $e');
+      _logger.severe('SignalR: Error leaving group: $e');
+      throw Exception('Failed to leave chat group: $e');
     }
   }
 
-  Future<void> notifyUserTyping(String chatIdGuid, bool isTyping) async {
-    if (!isConnected || _hubConnection == null) return;
+  Future<void> notifyTyping(String chatId, bool isTyping) async {
+    if (!isConnected || _hubConnection == null) {
+      _logger.warning('SignalR: Cannot notify typing: Not connected.');
+      return;
+    }
     try {
-      await _hubConnection!.invoke('UserTyping', args: [chatIdGuid, isTyping]);
+      await _hubConnection!.invoke('NotifyTyping', args: [chatId, isTyping]);
+      _logger.fine('SignalR: Typing notification sent: $isTyping');
     } catch (e) {
-      _logger.severe('SignalR: Error invoking UserTyping: $e');
+      _logger.warning('SignalR: Error notifying typing: $e');
     }
   }
 
   void dispose() {
-    _logger.info('SignalRService disposing...');
+    _logger.info('Disposing SignalRService...');
     _connectionStatusController.close();
     _newMessageReceivedController.close();
+    _messageUpdatedController.close();
     _messageConfirmationController.close();
     _userStatusChangedController.close();
-    _userTypingController.close();
     _messageStatusChangedController.close();
-    _messageUpdatedController.close();
+    _userTypingController.close();
     disconnect();
   }
 }
