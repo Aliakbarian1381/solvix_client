@@ -27,6 +27,8 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'firebase_options.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -39,16 +41,23 @@ Future<void> main() async {
 
   await Hive.initFlutter();
 
-  Hive.registerAdapter(MessageModelAdapter());
-  Hive.registerAdapter(ChatModelAdapter());
-  Hive.registerAdapter(UserModelAdapter());
-  Hive.registerAdapter(ClientMessageStatusAdapter());
+  try {
+    Hive.registerAdapter(MessageModelAdapter());
+    Hive.registerAdapter(ChatModelAdapter());
+    Hive.registerAdapter(UserModelAdapter());
+    Hive.registerAdapter(ClientMessageStatusAdapter());
+  } catch (e) {
+    print('Error registering Hive adapters: $e');
+  }
 
-  await Hive.openBox<ChatModel>('chats');
-  await Hive.openBox<MessageModel>('messages');
-
-  await Hive.openBox<UserModel>('users');
-  await Hive.openBox<UserModel>('synced_contacts');
+  try {
+    await Hive.openBox<ChatModel>('chats');
+    await Hive.openBox<MessageModel>('messages');
+    await Hive.openBox<UserModel>('users');
+    await Hive.openBox<UserModel>('synced_contacts');
+  } catch (e) {
+    print('Error opening Hive boxes: $e');
+  }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
