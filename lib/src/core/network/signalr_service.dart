@@ -4,7 +4,6 @@ import 'package:logging/logging.dart';
 import 'package:signalr_core/signalr_core.dart';
 import 'package:solvix/src/core/models/message_model.dart';
 import 'package:solvix/src/core/services/storage_service.dart';
-
 import '../models/client_message_status.dart';
 
 // اضافه کردن URL ثابت مثل سایر service ها
@@ -51,7 +50,11 @@ class SignalRService {
 
   SignalRService(this._storageService);
 
+  // ✅ Fix 1: اضافه کردن getter برای connectionStatusStream
   Stream<SignalRConnectionStatus> get connectionStatus =>
+      _connectionStatusController.stream;
+
+  Stream<SignalRConnectionStatus> get connectionStatusStream =>
       _connectionStatusController.stream;
 
   Stream<MessageModel> get onNewMessageReceived =>
@@ -60,6 +63,10 @@ class SignalRService {
   Stream<MessageModel> get onMessageUpdated => _messageUpdatedController.stream;
 
   Stream<MessageConfirmation> get onMessageConfirmation =>
+      _messageConfirmationController.stream;
+
+  // ✅ Fix 2: اضافه کردن getter برای onMessageConfirmationReceived
+  Stream<MessageConfirmation> get onMessageConfirmationReceived =>
       _messageConfirmationController.stream;
 
   Stream<Map<String, dynamic>> get onUserStatusChanged =>
@@ -330,6 +337,29 @@ class SignalRService {
     } catch (e) {
       _logger.severe('SignalR: Error leaving group: $e');
       throw Exception('Failed to leave chat group: $e');
+    }
+  }
+
+  // ✅ Fix 3: اضافه کردن method markMultipleMessagesAsRead
+  Future<void> markMultipleMessagesAsRead(
+    String chatId,
+    List<int> messageIds,
+  ) async {
+    if (!isConnected || _hubConnection == null) {
+      _logger.warning('SignalR: Cannot mark messages as read: Not connected.');
+      throw Exception('SignalR not connected');
+    }
+    try {
+      await _hubConnection!.invoke(
+        'MarkMultipleMessagesAsRead',
+        args: [chatId, messageIds],
+      );
+      _logger.info(
+        'SignalR: Marked ${messageIds.length} messages as read in chat $chatId',
+      );
+    } catch (e) {
+      _logger.severe('SignalR: Error marking messages as read: $e');
+      throw Exception('Failed to mark messages as read: $e');
     }
   }
 

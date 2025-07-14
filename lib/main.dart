@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -8,18 +9,18 @@ import 'package:solvix/src/app_bloc.dart';
 import 'package:solvix/src/app_event.dart';
 import 'package:solvix/src/core/api/auth_service.dart';
 import 'package:solvix/src/core/api/chat/chat_service.dart';
-import 'package:solvix/src/core/api/search_service.dart';
+import 'package:solvix/src/core/api/search_service.dart'; // ✅ این فایل موجود است
 import 'package:solvix/src/core/api/user/user_service.dart';
 import 'package:solvix/src/core/models/chat_model.dart';
 import 'package:solvix/src/core/models/client_message_status.dart';
 import 'package:solvix/src/core/models/message_model.dart';
 import 'package:dio/dio.dart';
 import 'package:solvix/src/core/models/user_model.dart';
-import 'package:solvix/src/core/network/connection_status/connection_status_bloc.dart';
+import 'package:solvix/src/core/network/connection_status/connection_status_bloc.dart'; // ✅ این فایل موجود است
 import 'package:solvix/src/core/network/notification_service.dart';
 import 'package:solvix/src/core/network/signalr_service.dart';
 import 'package:solvix/src/core/services/storage_service.dart';
-import 'package:solvix/src/core/theme/theme_cubit.dart';
+import 'package:solvix/src/core/theme/theme_cubit.dart'; // ✅ مسیر صحیح این است
 import 'package:solvix/src/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:solvix/src/features/contacts/presentation/bloc/contacts_bloc.dart';
 import 'package:solvix/src/features/home/presentation/bloc/chat_list_bloc.dart';
@@ -28,7 +29,6 @@ import 'package:timezone/timezone.dart' as tz;
 import 'firebase_options.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -70,11 +70,11 @@ Future<void> main() async {
 
   final storageService = StorageService();
   final authService = AuthService();
-  final signalRService = SignalRService();
+  final signalRService = SignalRService(storageService);
   final chatService = ChatService();
   final dio = Dio();
   final userService = UserService(dio, storageService);
-  final searchService = SearchService();
+  final searchService = SearchService(); // ✅ SearchService موجود است
   final notificationService = NotificationService(userService);
 
   final authBloc = AuthBloc(authService, storageService);
@@ -98,7 +98,9 @@ Future<void> main() async {
           BlocProvider.value(value: chatListBloc),
           BlocProvider.value(value: contactsBloc),
           BlocProvider<ThemeCubit>(create: (context) => ThemeCubit()),
+          // ✅ ThemeCubit موجود است
           BlocProvider<ConnectionStatusBloc>(
+            // ✅ ConnectionStatusBloc موجود است
             create: (context) =>
                 ConnectionStatusBloc(context.read<SignalRService>()),
             lazy: false,

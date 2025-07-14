@@ -320,7 +320,12 @@ class ChatMessagesBloc extends Bloc<ChatMessagesEvent, ChatMessagesState> {
 
       if (unreadMessageIds.isNotEmpty) {
         try {
-          await _signalRService.markMultipleMessagesAsRead(unreadMessageIds);
+          // ✅ Fix: ارسال chatId و messageIds به صورت صحیح
+          await _signalRService.markMultipleMessagesAsRead(
+            chatId,
+            unreadMessageIds,
+          );
+
           final updatedMessages = currentState.messages.map((m) {
             if (unreadMessageIds.contains(m.id)) {
               final updatedMsg = m.copyWith(isRead: true);
@@ -330,7 +335,11 @@ class ChatMessagesBloc extends Bloc<ChatMessagesEvent, ChatMessagesState> {
             return m;
           }).toList();
           emit(ChatMessagesLoaded(updatedMessages));
-        } catch (e) {}
+        } catch (e) {
+          // در صورت خطا در SignalR، فعلاً هیچ کاری نمی‌کنیم
+          // می‌توان لاگ اضافه کرد
+          print('Error marking messages as read: $e');
+        }
       }
     }
   }
