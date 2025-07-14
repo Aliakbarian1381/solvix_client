@@ -1,11 +1,11 @@
-// In: lib/src/features/new_chat/presentation/screens/create_group_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:solvix/src/core/api/chat/chat_service.dart';
 import 'package:solvix/src/core/api/user/user_service.dart';
 import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/features/contacts/presentation/bloc/contacts_bloc.dart';
+import 'package:solvix/src/features/contacts/presentation/bloc/contacts_event.dart';
+import 'package:solvix/src/features/contacts/presentation/bloc/contacts_state.dart';
 import 'package:solvix/src/features/home/presentation/bloc/chat_list_bloc.dart';
 
 class CreateGroupScreen extends StatefulWidget {
@@ -131,7 +131,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (state.status == ContactsStatus.failure) {
-                  return Center(child: Text('خطا: ${state.errorMessage}'));
+                  return Center(
+                    child: Text('خطا: ${state.errorMessage ?? "خطای نامشخص"}'),
+                  );
                 }
                 if (state.syncedContacts.isEmpty) {
                   return const Center(child: Text('هیچ مخاطبی یافت نشد.'));
@@ -143,10 +145,23 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     final isSelected = _selectedUserIds.contains(user.id);
                     return ListTile(
                       leading: CircleAvatar(
-                        // ... (کد آواتار مشابه قبل)
+                        backgroundColor: Theme.of(context).primaryColor,
+                        backgroundImage: user.profilePictureUrl != null
+                            ? NetworkImage(user.profilePictureUrl!)
+                            : null,
+                        child: user.profilePictureUrl == null
+                            ? Text(
+                                user.avatarInitials,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
                       ),
                       title: Text(
-                        "${user.firstName ?? ''} ${user.lastName ?? ''}".trim(),
+                        user.fullName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(user.phoneNumber ?? ''),
                       trailing: Checkbox(
