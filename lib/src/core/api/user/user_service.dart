@@ -1,10 +1,8 @@
-// lib/src/core/api/user/user_service.dart
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/core/services/storage_service.dart';
 
-// اضافه کردن base URL مثل سایر service ها
 const String _userBaseUrl = "https://api.solvix.ir/api/user";
 
 class UserService {
@@ -12,12 +10,10 @@ class UserService {
   final StorageService _storageService;
 
   UserService(this._dio, this._storageService) {
-    // تنظیم base URL برای این service
     _setupDio();
   }
 
   void _setupDio() {
-    // اضافه کردن interceptor برای authentication
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest:
@@ -30,195 +26,256 @@ class UserService {
                   'application/json; charset=UTF-8';
               handler.next(options);
             },
+        onError: (DioException e, ErrorInterceptorHandler handler) {
+          print('DioError: ${e.type}');
+          print('Status: ${e.response?.statusCode}');
+          print('Data: ${e.response?.data}');
+          handler.next(e);
+        },
       ),
     );
   }
 
-  // ===== متدهای موجود =====
+  // Helper method برای پردازش response
+  List<UserModel> _parseUserListResponse(dynamic responseData) {
+    if (responseData is Map<String, dynamic>) {
+      // اگر response یک Map بود، دنبال key های معمول بگرد
+      if (responseData.containsKey('data')) {
+        responseData = responseData['data'];
+      } else if (responseData.containsKey('result')) {
+        responseData = responseData['result'];
+      } else if (responseData.containsKey('users')) {
+        responseData = responseData['users'];
+      }
+    }
+
+    if (responseData is List) {
+      return responseData.map((json) => UserModel.fromJson(json)).toList();
+    } else {
+      print('Unexpected response format: $responseData');
+      return [];
+    }
+  }
 
   Future<List<UserModel>> searchUsers(String query) async {
     try {
       final response = await _dio.get(
-        '$_userBaseUrl/search', // استفاده از full URL
+        '$_userBaseUrl/search',
         queryParameters: {'query': query},
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in searchUsers: ${e.message}');
       throw Exception('خطا در جستجوی کاربران: ${e.message}');
+    } catch (e) {
+      print('General exception in searchUsers: $e');
+      throw Exception('خطا در جستجوی کاربران: $e');
     }
   }
 
   Future<List<UserModel>> syncContacts(List<String> phoneNumbers) async {
     try {
       final response = await _dio.post(
-        '$_userBaseUrl/sync-contacts', // استفاده از full URL
+        '$_userBaseUrl/sync-contacts',
         data: phoneNumbers,
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in syncContacts: ${e.message}');
+      print('Response data: ${e.response?.data}');
       throw Exception('خطا در همگام‌سازی مخاطبین: ${e.message}');
+    } catch (e) {
+      print('General exception in syncContacts: $e');
+      throw Exception('خطا در همگام‌سازی مخاطبین: $e');
     }
   }
 
   Future<List<UserModel>> getSavedContacts() async {
     try {
-      final response = await _dio.get(
-        '$_userBaseUrl/saved-contacts',
-      ); // استفاده از full URL
+      final response = await _dio.get('$_userBaseUrl/saved-contacts');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in getSavedContacts: ${e.message}');
       throw Exception('خطا در دریافت مخاطبین: ${e.message}');
+    } catch (e) {
+      print('General exception in getSavedContacts: $e');
+      throw Exception('خطا در دریافت مخاطبین: $e');
     }
   }
 
   Future<List<UserModel>> getSavedContactsWithChat() async {
     try {
-      final response = await _dio.get(
-        '$_userBaseUrl/saved-contacts-with-chat',
-      ); // استفاده از full URL
+      final response = await _dio.get('$_userBaseUrl/saved-contacts-with-chat');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in getSavedContactsWithChat: ${e.message}');
       throw Exception('خطا در دریافت مخاطبین با اطلاعات چت: ${e.message}');
+    } catch (e) {
+      print('General exception in getSavedContactsWithChat: $e');
+      throw Exception('خطا در دریافت مخاطبین با اطلاعات چت: $e');
     }
   }
 
   Future<UserModel?> getUserById(int userId) async {
     try {
-      final response = await _dio.get(
-        '$_userBaseUrl/$userId',
-      ); // استفاده از full URL
+      final response = await _dio.get('$_userBaseUrl/$userId');
 
       if (response.statusCode == 200) {
-        return UserModel.fromJson(response.data);
+        dynamic responseData = response.data;
+
+        // اگر response یک Map بود که داخلش data هست
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('data')) {
+            responseData = responseData['data'];
+          } else if (responseData.containsKey('user')) {
+            responseData = responseData['user'];
+          }
+        }
+
+        return UserModel.fromJson(responseData);
       }
       return null;
     } on DioException catch (e) {
+      print('DioException in getUserById: ${e.message}');
       throw Exception('خطا در دریافت کاربر: ${e.message}');
+    } catch (e) {
+      print('General exception in getUserById: $e');
+      throw Exception('خطا در دریافت کاربر: $e');
     }
   }
 
   Future<List<UserModel>> getOnlineUsers() async {
     try {
-      final response = await _dio.get(
-        '$_userBaseUrl/online',
-      ); // استفاده از full URL
+      final response = await _dio.get('$_userBaseUrl/online');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in getOnlineUsers: ${e.message}');
       throw Exception('خطا در دریافت کاربران آنلاین: ${e.message}');
+    } catch (e) {
+      print('General exception in getOnlineUsers: $e');
+      throw Exception('خطا در دریافت کاربران آنلاین: $e');
     }
   }
 
   Future<void> updateFcmToken(String token) async {
     try {
-      await _dio.post(
-        '$_userBaseUrl/update-fcm-token', // استفاده از full URL
-        data: {'token': token},
-      );
+      await _dio.post('$_userBaseUrl/update-fcm-token', data: {'token': token});
     } on DioException catch (e) {
+      print('DioException in updateFcmToken: ${e.message}');
       throw Exception('خطا در به‌روزرسانی FCM token: ${e.message}');
+    } catch (e) {
+      print('General exception in updateFcmToken: $e');
+      throw Exception('خطا در به‌روزرسانی FCM token: $e');
     }
   }
 
-  // ===== متدهای جدید برای مدیریت مخاطبین =====
-
+  // متدهای جدید برای مدیریت مخاطبین
   Future<List<UserModel>> searchContacts(String query, {int limit = 20}) async {
     try {
       final response = await _dio.get(
-        '$_userBaseUrl/contacts/search', // استفاده از full URL
+        '$_userBaseUrl/contacts/search',
         queryParameters: {'query': query, 'limit': limit},
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in searchContacts: ${e.message}');
       throw Exception('خطا در جستجوی مخاطبین: ${e.message}');
+    } catch (e) {
+      print('General exception in searchContacts: $e');
+      throw Exception('خطا در جستجوی مخاطبین: $e');
     }
   }
 
   Future<List<UserModel>> getFavoriteContacts() async {
     try {
-      final response = await _dio.get(
-        '$_userBaseUrl/contacts/favorites',
-      ); // استفاده از full URL
+      final response = await _dio.get('$_userBaseUrl/contacts/favorites');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in getFavoriteContacts: ${e.message}');
       throw Exception('خطا در دریافت مخاطبین مورد علاقه: ${e.message}');
+    } catch (e) {
+      print('General exception in getFavoriteContacts: $e');
+      throw Exception('خطا در دریافت مخاطبین مورد علاقه: $e');
     }
   }
 
   Future<List<UserModel>> getRecentContacts({int limit = 10}) async {
     try {
       final response = await _dio.get(
-        '$_userBaseUrl/contacts/recent', // استفاده از full URL
+        '$_userBaseUrl/contacts/recent',
         queryParameters: {'limit': limit},
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in getRecentContacts: ${e.message}');
       throw Exception('خطا در دریافت مخاطبین اخیر: ${e.message}');
+    } catch (e) {
+      print('General exception in getRecentContacts: $e');
+      throw Exception('خطا در دریافت مخاطبین اخیر: $e');
     }
   }
 
   Future<bool> toggleFavoriteContact(int contactId, bool isFavorite) async {
     try {
       final response = await _dio.put(
-        '$_userBaseUrl/contacts/$contactId/favorite', // استفاده از full URL
+        '$_userBaseUrl/contacts/$contactId/favorite',
         data: {'isFavorite': isFavorite},
       );
-
       return response.statusCode == 200;
     } on DioException catch (e) {
+      print('DioException in toggleFavoriteContact: ${e.message}');
       throw Exception('خطا در تغییر وضعیت علاقه‌مندی: ${e.message}');
+    } catch (e) {
+      print('General exception in toggleFavoriteContact: $e');
+      throw Exception('خطا در تغییر وضعیت علاقه‌مندی: $e');
     }
   }
 
   Future<bool> toggleBlockContact(int contactId, bool isBlocked) async {
     try {
       final response = await _dio.put(
-        '$_userBaseUrl/contacts/$contactId/block', // استفاده از full URL
+        '$_userBaseUrl/contacts/$contactId/block',
         data: {'isBlocked': isBlocked},
       );
-
       return response.statusCode == 200;
     } on DioException catch (e) {
+      print('DioException in toggleBlockContact: ${e.message}');
       throw Exception('خطا در تغییر وضعیت مسدودیت: ${e.message}');
+    } catch (e) {
+      print('General exception in toggleBlockContact: $e');
+      throw Exception('خطا در تغییر وضعیت مسدودیت: $e');
     }
   }
 
@@ -228,24 +285,29 @@ class UserService {
   ) async {
     try {
       final response = await _dio.put(
-        '$_userBaseUrl/contacts/$contactId/display-name', // استفاده از full URL
+        '$_userBaseUrl/contacts/$contactId/display-name',
         data: {'displayName': displayName},
       );
-
       return response.statusCode == 200;
     } on DioException catch (e) {
+      print('DioException in updateContactDisplayName: ${e.message}');
       throw Exception('خطا در به‌روزرسانی نام نمایشی: ${e.message}');
+    } catch (e) {
+      print('General exception in updateContactDisplayName: $e');
+      throw Exception('خطا در به‌روزرسانی نام نمایشی: $e');
     }
   }
 
   Future<bool> removeContact(int contactId) async {
     try {
-      final response = await _dio.delete(
-        '$_userBaseUrl/contacts/$contactId',
-      ); // استفاده از full URL
+      final response = await _dio.delete('$_userBaseUrl/contacts/$contactId');
       return response.statusCode == 200;
     } on DioException catch (e) {
+      print('DioException in removeContact: ${e.message}');
       throw Exception('خطا در حذف مخاطب: ${e.message}');
+    } catch (e) {
+      print('General exception in removeContact: $e');
+      throw Exception('خطا در حذف مخاطب: $e');
     }
   }
 
@@ -253,27 +315,35 @@ class UserService {
     try {
       final response = await _dio.post(
         '$_userBaseUrl/contacts/$contactId/interaction',
-      ); // استفاده از full URL
+      );
       return response.statusCode == 200;
     } on DioException catch (e) {
+      print('DioException in updateLastInteraction: ${e.message}');
       throw Exception('خطا در به‌روزرسانی آخرین تعامل: ${e.message}');
+    } catch (e) {
+      print('General exception in updateLastInteraction: $e');
+      throw Exception('خطا در به‌روزرسانی آخرین تعامل: $e');
     }
   }
 
-  // ===== متدهای کمکی =====
-
   Future<Map<String, dynamic>> getContactsStatistics() async {
     try {
-      final response = await _dio.get(
-        '$_userBaseUrl/contacts/statistics',
-      ); // استفاده از full URL
+      final response = await _dio.get('$_userBaseUrl/contacts/statistics');
 
       if (response.statusCode == 200) {
-        return response.data as Map<String, dynamic>;
+        dynamic responseData = response.data;
+        if (responseData is Map<String, dynamic>) {
+          return responseData;
+        }
+        return {};
       }
       return {};
     } on DioException catch (e) {
+      print('DioException in getContactsStatistics: ${e.message}');
       throw Exception('خطا در دریافت آمار مخاطبین: ${e.message}');
+    } catch (e) {
+      print('General exception in getContactsStatistics: $e');
+      throw Exception('خطا در دریافت آمار مخاطبین: $e');
     }
   }
 
@@ -295,34 +365,39 @@ class UserService {
       if (hasChat != null) queryParams['hasChat'] = hasChat;
 
       final response = await _dio.get(
-        '$_userBaseUrl/contacts/filtered', // استفاده از full URL
+        '$_userBaseUrl/contacts/filtered',
         queryParameters: queryParams,
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => UserModel.fromJson(json)).toList();
+        return _parseUserListResponse(response.data);
       }
       return [];
     } on DioException catch (e) {
+      print('DioException in getFilteredContacts: ${e.message}');
       throw Exception('خطا در دریافت مخاطبین فیلتر شده: ${e.message}');
+    } catch (e) {
+      print('General exception in getFilteredContacts: $e');
+      throw Exception('خطا در دریافت مخاطبین فیلتر شده: $e');
     }
   }
 
-  // متد کمکی برای batch operations
   Future<bool> batchUpdateContacts(
     List<int> contactIds,
     Map<String, dynamic> updates,
   ) async {
     try {
       final response = await _dio.patch(
-        '$_userBaseUrl/contacts/batch', // استفاده از full URL
+        '$_userBaseUrl/contacts/batch',
         data: {'contactIds': contactIds, 'updates': updates},
       );
-
       return response.statusCode == 200;
     } on DioException catch (e) {
+      print('DioException in batchUpdateContacts: ${e.message}');
       throw Exception('خطا در به‌روزرسانی گروهی مخاطبین: ${e.message}');
+    } catch (e) {
+      print('General exception in batchUpdateContacts: $e');
+      throw Exception('خطا در به‌روزرسانی گروهی مخاطبین: $e');
     }
   }
 }
