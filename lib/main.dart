@@ -51,6 +51,7 @@ Future<void> main() async {
   }
 
   try {
+    await Hive.deleteFromDisk();
     await Hive.openBox<ChatModel>('chats');
     await Hive.openBox<MessageModel>('messages');
     await Hive.openBox<UserModel>('users');
