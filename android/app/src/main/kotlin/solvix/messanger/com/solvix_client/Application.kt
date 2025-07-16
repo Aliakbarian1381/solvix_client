@@ -1,6 +1,11 @@
 package solvix.messanger.com.solvix_client
 
-import io.flutter.app.FlutterApplication
+import android.app.Application
 
-class Application : FlutterApplication() {
+class Application : Application() {
+
+    override fun onCreate() {
+        super.onCreate()
+        // اگر نیاز به initialization خاصی دارید، اینجا اضافه کنید
+    }
 }

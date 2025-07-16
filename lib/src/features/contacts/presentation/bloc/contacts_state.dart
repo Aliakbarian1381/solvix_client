@@ -110,28 +110,48 @@ class ContactsState extends Equatable {
     chatToOpen,
   ];
 
-  // Computed properties
-  List<UserModel> get nonBlockedContacts => syncedContacts.where((c) => !c.isBlocked).toList();
-  List<UserModel> get blockedContacts => syncedContacts.where((c) => c.isBlocked).toList();
-  List<UserModel> get favoriteNonBlockedContacts => syncedContacts.where((c) => c.isFavorite && !c.isBlocked).toList();
+  // Computed properties با null safety
+  List<UserModel> get nonBlockedContacts =>
+      syncedContacts.where((c) => c.isBlocked == false).toList();
+
+  List<UserModel> get blockedContacts =>
+      syncedContacts.where((c) => c.isBlocked == true).toList();
+
+  List<UserModel> get favoriteNonBlockedContacts => syncedContacts
+      .where((c) => c.isFavorite == true && c.isBlocked == false)
+      .toList();
 
   int get totalNonBlockedContacts => nonBlockedContacts.length;
+
   int get totalFavoriteContacts => favoriteNonBlockedContacts.length;
+
   int get totalBlockedContacts => blockedContacts.length;
 
   bool get hasContacts => syncedContacts.isNotEmpty;
+
   bool get hasSearchResults => searchResults.isNotEmpty;
+
   bool get hasFavorites => favoriteContacts.isNotEmpty;
+
   bool get hasRecent => recentContacts.isNotEmpty;
 
   bool get isLoading => status == ContactsStatus.loading;
-  bool get isSyncing => status == ContactsStatus.syncing;
-  bool get isRefreshing => status == ContactsStatus.refreshing;
-  bool get isBackgroundSyncing => status == ContactsStatus.backgroundSyncing;
-  bool get isSuccess => status == ContactsStatus.success;
-  bool get isFailure => status == ContactsStatus.failure;
-  bool get isPermissionDenied => status == ContactsStatus.permissionDenied;
-  bool get isPermissionPermanentlyDenied => status == ContactsStatus.permissionPermanentlyDenied;
 
-  double get syncProgress => totalContacts > 0 ? syncedCount / totalContacts : 0.0;
+  bool get isSyncing => status == ContactsStatus.syncing;
+
+  bool get isRefreshing => status == ContactsStatus.refreshing;
+
+  bool get isBackgroundSyncing => status == ContactsStatus.backgroundSyncing;
+
+  bool get isSuccess => status == ContactsStatus.success;
+
+  bool get isFailure => status == ContactsStatus.failure;
+
+  bool get isPermissionDenied => status == ContactsStatus.permissionDenied;
+
+  bool get isPermissionPermanentlyDenied =>
+      status == ContactsStatus.permissionPermanentlyDenied;
+
+  double get syncProgress =>
+      totalContacts > 0 ? syncedCount / totalContacts : 0.0;
 }
