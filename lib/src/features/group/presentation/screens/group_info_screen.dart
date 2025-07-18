@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:shamsi_date/shamsi_date.dart';
 import 'package:solvix/src/core/models/group_info_model.dart';
 import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_info_bloc.dart';
+import 'package:solvix/src/features/group/presentation/bloc/group_members_bloc.dart';
 import 'package:solvix/src/features/group/presentation/screens/group_members_screen.dart';
 import 'package:solvix/src/features/group/presentation/screens/group_settings_screen.dart';
 import 'package:solvix/src/features/group/presentation/screens/edit_group_screen.dart';
+import 'package:solvix/src/features/group/presentation/widgets/group_avatar.dart';
 
 class GroupInfoScreen extends StatefulWidget {
   final String chatId;
@@ -72,71 +77,89 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (state is GroupInfoLoaded) {
-            return _buildGroupInfoContent(context, state.groupInfo);
-          }
-
           if (state is GroupInfoError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                  Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
                   const SizedBox(height: 16),
                   Text(
+                    'خطا در بارگذاری اطلاعات گروه',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
                     state.message,
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
+                  const SizedBox(height: 24),
+                  ElevatedButton(
                     onPressed: () {
                       context.read<GroupInfoBloc>().add(
                         LoadGroupInfo(widget.chatId),
                       );
                     },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('تلاش مجدد'),
+                    child: const Text('تلاش مجدد'),
                   ),
                 ],
               ),
             );
           }
 
-          return const Center(child: CircularProgressIndicator());
+          if (state is GroupInfoLoaded) {
+            return _buildGroupInfo(context, state.groupInfo);
+          }
+
+          return const Center(child: Text('وضعیت نامشخص'));
         },
       ),
     );
   }
 
-  Widget _buildGroupInfoContent(
-    BuildContext context,
-    GroupInfoModel groupInfo,
-  ) {
-    final theme = Theme.of(context);
-    final currentUserRole = _getCurrentUserRole(groupInfo, widget.currentUser);
-    final isOwner = currentUserRole == GroupRole.owner;
-    final isAdmin = currentUserRole == GroupRole.admin || isOwner;
+  Widget _buildGroupInfo(BuildContext context, GroupInfoModel groupInfo) {
+    final currentUser = widget.currentUser;
+    final isOwner = currentUser?.id == groupInfo.ownerId;
+    final isAdmin = _isUserAdmin(groupInfo, currentUser?.id);
 
     return CustomScrollView(
       slivers: [
-        // App Bar with Group Image
+        // App Bar
         SliverAppBar(
-          expandedHeight: 300,
+          expandedHeight: 200,
+          floating: false,
           pinned: true,
           flexibleSpace: FlexibleSpaceBar(
-            background: _buildGroupHeader(context, groupInfo),
+            background: _buildHeaderBackground(context, groupInfo),
+            title: Text(
+              groupInfo.title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                shadows: [
+                  Shadow(
+                    offset: Offset(0, 1),
+                    blurRadius: 3,
+                    color: Colors.black45,
+                  ),
+                ],
+              ),
+            ),
+            centerTitle: true,
           ),
           actions: [
             if (isAdmin)
               IconButton(
                 onPressed: () => _navigateToEditGroup(context, groupInfo),
-                icon: const Icon(Icons.edit),
+                icon: const Icon(Icons.edit, color: Colors.white),
                 tooltip: 'ویرایش گروه',
               ),
             PopupMenuButton<String>(
               onSelected: (value) =>
                   _handleMenuAction(context, value, groupInfo),
+              icon: const Icon(Icons.more_vert, color: Colors.white),
               itemBuilder: (context) => [
                 if (isOwner)
                   const PopupMenuItem(
@@ -163,6 +186,16 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                       ],
                     ),
                   ),
+                const PopupMenuItem(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      Icon(Icons.report, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('گزارش گروه'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ],
@@ -182,20 +215,23 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
 
                 const SizedBox(height: 16),
 
-                // Members Section
-                _buildMembersCard(context, groupInfo, isAdmin),
+                // Quick Actions
+                _buildQuickActions(context, groupInfo, isAdmin),
 
                 const SizedBox(height: 16),
 
-                // Settings Section (Admin only)
-                if (isAdmin) _buildSettingsCard(context, groupInfo),
-
-                const SizedBox(height: 16),
-
-                // Info Cards
+                // Group Info Cards
                 _buildInfoCards(context, groupInfo),
 
-                const SizedBox(height: 100), // Bottom padding
+                const SizedBox(height: 16),
+
+                // Members Preview
+                _buildMembersPreview(context, groupInfo),
+
+                const SizedBox(height: 16),
+
+                // Settings Summary
+                _buildSettingsSummary(context, groupInfo),
               ],
             ),
           ),
@@ -204,7 +240,10 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     );
   }
 
-  Widget _buildGroupHeader(BuildContext context, GroupInfoModel groupInfo) {
+  Widget _buildHeaderBackground(
+    BuildContext context,
+    GroupInfoModel groupInfo,
+  ) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -216,86 +255,31 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           ],
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(height: 40),
-            // Group Avatar
-            Hero(
-              tag: 'group_avatar_${groupInfo.id}',
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.white,
-                child: groupInfo.groupImageUrl != null
-                    ? ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: groupInfo.groupImageUrl!,
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) =>
-                              const CircularProgressIndicator(),
-                          errorWidget: (context, url, error) =>
-                              _buildGroupAvatar(groupInfo.title),
-                        ),
-                      )
-                    : _buildGroupAvatar(groupInfo.title),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Group Title
-            Text(
-              groupInfo.title,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            // Group Stats
-            Text(
-              '${groupInfo.membersCount} عضو • ساخته شده در ${_formatDate(groupInfo.createdAt)}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.9),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+      child: Stack(
+        children: [
+          // Background pattern
+          Positioned.fill(child: CustomPaint(painter: _PatternPainter())),
 
-  Widget _buildGroupAvatar(String title) {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [Colors.blue[400]!, Colors.purple[400]!],
-        ),
-      ),
-      child: Center(
-        child: Text(
-          title.isNotEmpty ? title[0].toUpperCase() : 'G',
-          style: const TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          // Group avatar
+          Center(
+            child: Hero(
+              tag: 'group_avatar_${groupInfo.id}',
+              child: GroupAvatar(
+                title: groupInfo.title,
+                avatarUrl: groupInfo.avatarUrl,
+                radius: 48,
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildDescriptionCard(BuildContext context, String description) {
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -303,22 +287,25 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.description, color: Theme.of(context).primaryColor),
+                Icon(
+                  Icons.description,
+                  color: Theme.of(context).primaryColor,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'توضیحات گروه',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               description,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-                height: 1.4,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.justify,
             ),
           ],
         ),
@@ -326,171 +313,100 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     );
   }
 
-  Widget _buildMembersCard(
+  Widget _buildQuickActions(
     BuildContext context,
     GroupInfoModel groupInfo,
     bool isAdmin,
   ) {
     return Card(
-      child: InkWell(
-        onTap: () => _navigateToMembers(context, groupInfo),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.group, color: Theme.of(context).primaryColor),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'اعضای گروه',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${groupInfo.membersCount} نفر',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios, size: 16),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Preview of first few members
-              ...groupInfo.members
-                  .take(3)
-                  .map(
-                    (member) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Theme.of(
-                              context,
-                            ).primaryColor.withOpacity(0.1),
-                            backgroundImage: member.profilePictureUrl != null
-                                ? CachedNetworkImageProvider(
-                                    member.profilePictureUrl!,
-                                  )
-                                : null,
-                            child: member.profilePictureUrl == null
-                                ? Text(
-                                    member.displayName.isNotEmpty
-                                        ? member.displayName[0].toUpperCase()
-                                        : 'U',
-                                    style: TextStyle(
-                                      color: Theme.of(context).primaryColor,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        member.displayName,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                    if (member.role == GroupRole.owner)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          '👑',
-                                          style: TextStyle(fontSize: 10),
-                                        ),
-                                      )
-                                    else if (member.role == GroupRole.admin)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          '⭐',
-                                          style: TextStyle(fontSize: 10),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                Text(
-                                  member.isOnline
-                                      ? 'آنلاین'
-                                      : _formatLastSeen(member.lastSeen),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: member.isOnline
-                                        ? Colors.green
-                                        : Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              if (groupInfo.membersCount > 3)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'و ${groupInfo.membersCount - 3} عضو دیگر...',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'عملیات سریع',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildActionButton(
+                  context,
+                  Icons.people,
+                  'اعضا',
+                  '${groupInfo.membersCount} نفر',
+                  () => _navigateToMembers(context, groupInfo),
                 ),
-            ],
-          ),
+                _buildActionButton(
+                  context,
+                  Icons.settings,
+                  'تنظیمات',
+                  isAdmin ? 'مدیریت' : 'مشاهده',
+                  () => _navigateToSettings(context, groupInfo),
+                ),
+                _buildActionButton(
+                  context,
+                  Icons.share,
+                  'اشتراک‌گذاری',
+                  'دعوت',
+                  () => _shareGroup(context, groupInfo),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSettingsCard(BuildContext context, GroupInfoModel groupInfo) {
-    return Card(
-      child: InkWell(
-        onTap: () => _navigateToSettings(context, groupInfo),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.settings, color: Theme.of(context).primaryColor),
-              const SizedBox(width: 8),
-              const Text(
-                'تنظیمات گروه',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+  Widget _buildActionButton(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const Spacer(),
-              const Icon(Icons.arrow_forward_ios, size: 16),
-            ],
-          ),
+              child: Icon(
+                icon,
+                color: Theme.of(context).primaryColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            ),
+          ],
         ),
       ),
     );
@@ -501,6 +417,10 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       children: [
         // Creation Info
         Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -511,18 +431,19 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                     Icon(
                       Icons.info_outline,
                       color: Theme.of(context).primaryColor,
+                      size: 20,
                     ),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'اطلاعات گروه',
-                      style: TextStyle(
-                        fontSize: 16,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                _buildInfoRow('شناسه گروه', groupInfo.id),
                 _buildInfoRow('مالک گروه', groupInfo.ownerName),
                 _buildInfoRow('تاریخ ایجاد', _formatDate(groupInfo.createdAt)),
                 _buildInfoRow('تعداد اعضا', '${groupInfo.membersCount} نفر'),
@@ -534,73 +455,217 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        // Settings Summary
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+      ],
+    );
+  }
+
+  Widget _buildMembersPreview(BuildContext context, GroupInfoModel groupInfo) {
+    final membersToShow = groupInfo.members.take(5).toList();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _navigateToMembers(context, groupInfo),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.people,
+                    color: Theme.of(context).primaryColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'اعضای گروه',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${groupInfo.membersCount} نفر',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ...membersToShow.map(
+                (member) => _buildMemberItem(context, member),
+              ),
+              if (groupInfo.membersCount > 5)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'و ${groupInfo.membersCount - 5} عضو دیگر...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberItem(BuildContext context, GroupMemberModel member) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+            backgroundImage: member.profilePictureUrl != null
+                ? CachedNetworkImageProvider(member.profilePictureUrl!)
+                : null,
+            child: member.profilePictureUrl == null
+                ? Text(
+                    member.displayName[0].toUpperCase(),
+                    style: TextStyle(
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.security, color: Theme.of(context).primaryColor),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'تنظیمات امنیتی',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                Text(
+                  member.displayName,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                 ),
-                const SizedBox(height: 12),
-                _buildSettingRow(
-                  'ارسال پیام',
-                  groupInfo.settings.onlyAdminsCanSendMessages
-                      ? 'فقط ادمین‌ها'
-                      : 'همه اعضا',
-                  groupInfo.settings.onlyAdminsCanSendMessages,
-                ),
-                _buildSettingRow(
-                  'اضافه کردن عضو',
-                  groupInfo.settings.onlyAdminsCanAddMembers
-                      ? 'فقط ادمین‌ها'
-                      : 'همه اعضا',
-                  groupInfo.settings.onlyAdminsCanAddMembers,
-                ),
-                _buildSettingRow(
-                  'ویرایش اطلاعات',
-                  groupInfo.settings.onlyAdminsCanEditGroupInfo
-                      ? 'فقط ادمین‌ها'
-                      : 'همه اعضا',
-                  groupInfo.settings.onlyAdminsCanEditGroupInfo,
+                Text(
+                  _getRoleDisplayName(member.role),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _getRoleColor(member.role),
+                  ),
                 ),
               ],
             ),
           ),
+          if (member.isOnline)
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsSummary(BuildContext context, GroupInfoModel groupInfo) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _navigateToSettings(context, groupInfo),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.security,
+                    color: Theme.of(context).primaryColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'تنظیمات امنیتی',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildSettingRow(
+                'ارسال پیام',
+                groupInfo.settings.onlyAdminsCanSendMessages
+                    ? 'فقط ادمین‌ها'
+                    : 'همه اعضا',
+                groupInfo.settings.onlyAdminsCanSendMessages,
+              ),
+              _buildSettingRow(
+                'اضافه کردن عضو',
+                groupInfo.settings.onlyAdminsCanAddMembers
+                    ? 'فقط ادمین‌ها'
+                    : 'همه اعضا',
+                groupInfo.settings.onlyAdminsCanAddMembers,
+              ),
+              _buildSettingRow(
+                'ویرایش اطلاعات',
+                groupInfo.settings.onlyAdminsCanEditInfo
+                    ? 'فقط ادمین‌ها'
+                    : 'همه اعضا',
+                groupInfo.settings.onlyAdminsCanEditInfo,
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 100,
             child: Text(
               label,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
             ),
           ),
+          const SizedBox(width: 16),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -610,34 +675,22 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
 
   Widget _buildSettingRow(String label, String value, bool isRestricted) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
+          Icon(
+            isRestricted ? Icons.lock : Icons.lock_open,
+            size: 16,
+            color: isRestricted ? Colors.orange : Colors.green,
           ),
-          Expanded(
-            child: Row(
-              children: [
-                Icon(
-                  isRestricted ? Icons.lock : Icons.lock_open,
-                  size: 16,
-                  color: isRestricted ? Colors.orange : Colors.green,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: isRestricted ? Colors.orange : Colors.green,
-                  ),
-                ),
-              ],
+          const SizedBox(width: 8),
+          Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          const Spacer(),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: isRestricted ? Colors.orange : Colors.green,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -645,31 +698,73 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     );
   }
 
-  GroupRole? _getCurrentUserRole(GroupInfoModel groupInfo, UserModel? currentUser) {
-    if (currentUser == null) return null;
+  String _formatDate(DateTime date) {
+    final jalali = Jalali.fromDateTime(date);
+    return '${jalali.day}/${jalali.month}/${jalali.year}';
+  }
 
-    final currentMember = groupInfo.members.firstWhere(
-          (member) => member.userId == currentUser.id,
-      orElse: () => GroupMemberModel(
-        userId: -1,
+  String _getRoleDisplayName(GroupRole role) {
+    switch (role) {
+      case GroupRole.owner:
+        return 'مالک گروه';
+      case GroupRole.admin:
+        return 'ادمین';
+      case GroupRole.member:
+        return 'عضو';
+    }
+  }
+
+  Color _getRoleColor(GroupRole role) {
+    switch (role) {
+      case GroupRole.owner:
+        return Colors.purple;
+      case GroupRole.admin:
+        return Colors.blue;
+      case GroupRole.member:
+        return Colors.grey;
+    }
+  }
+
+  bool _isUserAdmin(GroupInfoModel groupInfo, int? userId) {
+    if (userId == null) return false;
+    if (userId == groupInfo.ownerId) return true;
+
+    final member = groupInfo.members.firstWhere(
+      (m) => m.id == userId,
+      orElse: () => const GroupMemberModel(
+        id: 0,
         username: '',
         role: GroupRole.member,
-        joinedAt: DateTime.now(),
+        joinedAt: null,
         isOnline: false,
       ),
     );
+    return member.role == GroupRole.admin;
+  }
 
-    return currentMember.userId != -1 ? currentMember.role : null;
+  void _navigateToEditGroup(BuildContext context, GroupInfoModel groupInfo) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BlocProvider.value(
+          value: context.read<GroupInfoBloc>(),
+          child: EditGroupScreen(chatId: widget.chatId, groupInfo: groupInfo),
+        ),
+      ),
+    );
   }
 
   void _navigateToMembers(BuildContext context, GroupInfoModel groupInfo) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GroupMembersScreen(
-          chatId: widget.chatId,
-          groupInfo: groupInfo,
-          currentUser: widget.currentUser,
+        builder: (context) => BlocProvider.value(
+          value: context.read<GroupMembersBloc>(),
+          child: GroupMembersScreen(
+            chatId: widget.chatId,
+            groupInfo: groupInfo,
+            currentUser: widget.currentUser,
+          ),
         ),
       ),
     );
@@ -679,23 +774,35 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GroupSettingsScreen(
-          chatId: widget.chatId,
-          groupInfo: groupInfo,
-          currentUser: widget.currentUser,
+        builder: (context) => BlocProvider.value(
+          value: context.read<GroupInfoBloc>(),
+          child: GroupSettingsScreen(
+            chatId: widget.chatId,
+            groupInfo: groupInfo,
+            currentUser: widget.currentUser,
+          ),
         ),
       ),
     );
   }
 
-  void _navigateToEditGroup(BuildContext context, GroupInfoModel groupInfo) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            EditGroupScreen(chatId: widget.chatId, groupInfo: groupInfo),
-      ),
-    );
+  void _shareGroup(BuildContext context, GroupInfoModel groupInfo) {
+    if (groupInfo.settings.joinLink != null) {
+      Clipboard.setData(ClipboardData(text: groupInfo.settings.joinLink!));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لینک دعوت کپی شد'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لینک دعوت برای این گروه وجود ندارد'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   void _handleMenuAction(
@@ -710,6 +817,9 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       case 'leave':
         _showLeaveGroupDialog(context);
         break;
+      case 'report':
+        _showReportGroupDialog(context);
+        break;
     }
   }
 
@@ -719,7 +829,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       builder: (context) => AlertDialog(
         title: const Text('حذف گروه'),
         content: const Text(
-          'آیا مطمئن هستید که می‌خواهید این گروه را حذف کنید؟ این عمل قابل بازگشت نیست.',
+          'آیا مطمئن هستید که می‌خواهید این گروه را حذف کنید؟ این عمل غیرقابل بازگشت است.',
         ),
         actions: [
           TextButton(
@@ -731,7 +841,8 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               Navigator.pop(context);
               context.read<GroupInfoBloc>().add(DeleteGroup(widget.chatId));
             },
-            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('حذف'),
           ),
         ],
       ),
@@ -756,48 +867,49 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               Navigator.pop(context);
               context.read<GroupInfoBloc>().add(LeaveGroup(widget.chatId));
             },
-            child: const Text('خروج', style: TextStyle(color: Colors.orange)),
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('خروج'),
           ),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
+  void _showReportGroupDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('گزارش گروه'),
+        content: const Text('قابلیت گزارش گروه به زودی اضافه خواهد شد.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('متوجه شدم'),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    if (difference.inDays == 0) {
-      return 'امروز';
-    } else if (difference.inDays == 1) {
-      return 'دیروز';
-    } else if (difference.inDays < 30) {
-      return '${difference.inDays} روز پیش';
-    } else if (difference.inDays < 365) {
-      final months = (difference.inDays / 30).floor();
-      return '$months ماه پیش';
-    } else {
-      final years = (difference.inDays / 365).floor();
-      return '$years سال پیش';
+// Custom painter for header pattern
+class _PatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..style = PaintingStyle.fill;
+
+    const double spacing = 30.0;
+    const double radius = 2.0;
+
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), radius, paint);
+      }
     }
   }
 
-  String _formatLastSeen(DateTime? lastSeen) {
-    if (lastSeen == null) return 'نامشخص';
-
-    final now = DateTime.now();
-    final difference = now.difference(lastSeen);
-
-    if (difference.inMinutes < 1) {
-      return 'همین الان';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} دقیقه پیش';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} ساعت پیش';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} روز پیش';
-    } else {
-      return _formatDate(lastSeen);
-    }
-  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

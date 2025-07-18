@@ -1075,24 +1075,164 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
+  UserModel? _getCurrentUser(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      return authState.user;
+    }
+    return null;
+  }
+
   void _navigateToGroupInfo(BuildContext context) {
+    final currentUser = _getCurrentUser(context);
+    if (currentUser == null) return;
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => MultiBlocProvider(
           providers: [
-            BlocProvider.value(
-              value: context.read<GroupInfoBloc>(),
-            ),
-            BlocProvider.value(
-              value: context.read<GroupMembersBloc>(),
-            ),
+            BlocProvider.value(value: context.read<GroupInfoBloc>()),
+            BlocProvider.value(value: context.read<GroupMembersBloc>()),
           ],
           child: GroupInfoScreen(
             chatId: chatModel.id,
-            currentUser: _getCurrentUser(context), // helper method
+            currentUser: currentUser,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TypingIndicator extends StatefulWidget {
+  final String chatId;
+  final int currentUserId;
+
+  const _TypingIndicator({required this.chatId, required this.currentUserId});
+
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  List<String> _typingUsers = [];
+  StreamSubscription? _typingSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _listenToTyping();
+  }
+
+  void _listenToTyping() {
+    final signalRService = context.read<SignalRService>();
+    _typingSubscription = signalRService.onUserTyping.listen((data) {
+      final chatId = data['chatId'] as String?;
+      final userId = data['userId'] as int?;
+      final isTyping = data['isTyping'] as bool?;
+
+      if (chatId == widget.chatId && userId != widget.currentUserId) {
+        setState(() {
+          final userName = _getUserName(userId);
+          if (isTyping == true) {
+            if (!_typingUsers.contains(userName)) {
+              _typingUsers.add(userName);
+            }
+          } else {
+            _typingUsers.remove(userName);
+          }
+        });
+
+        if (_typingUsers.isNotEmpty) {
+          _animationController.repeat();
+        } else {
+          _animationController.stop();
+        }
+      }
+    });
+  }
+
+  String _getUserName(int? userId) {
+    if (userId == null) return 'کاربر';
+    // اینجا می‌توانید از cache یا state management برای گرفتن نام کاربر استفاده کنید
+    return 'کاربر $userId';
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _typingSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_typingUsers.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final typingText = _typingUsers.length == 1
+        ? '${_typingUsers.first} در حال نوشتن...'
+        : '${_typingUsers.length} نفر در حال نوشتن...';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              return Row(
+                children: [
+                  for (int i = 0; i < 3; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.only(right: 2),
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(
+                          (((_animation.value + i * 0.3) % 1.0) * 0.7) + 0.3,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          Text(
+            typingText,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1119,6 +1259,8 @@ class _ModernMessageInputState extends State<_ModernMessageInput> {
   final Uuid _uuid = const Uuid();
   bool _showSendButton = false;
   TextDirection _textDirection = TextDirection.rtl;
+  Timer? _typingTimer;
+  bool _isTyping = false;
 
   @override
   void initState() {
@@ -1130,8 +1272,36 @@ class _ModernMessageInputState extends State<_ModernMessageInput> {
         setState(() {
           _showSendButton = currentText.trim().isNotEmpty;
         });
+        _handleTyping(currentText.isNotEmpty);
       }
     });
+  }
+
+  void _handleTyping(bool isTyping) {
+    if (_isTyping != isTyping) {
+      _isTyping = isTyping;
+      _notifyTypingStatus(isTyping);
+    }
+
+    // Reset typing timer
+    _typingTimer?.cancel();
+    if (isTyping) {
+      _typingTimer = Timer(const Duration(seconds: 2), () {
+        if (_isTyping) {
+          _isTyping = false;
+          _notifyTypingStatus(false);
+        }
+      });
+    }
+  }
+
+  void _notifyTypingStatus(bool isTyping) {
+    try {
+      final signalRService = context.read<SignalRService>();
+      signalRService.notifyTyping(widget.chatId, isTyping);
+    } catch (e) {
+      print('Error notifying typing status: $e');
+    }
   }
 
   void _updateTextDirection(String text) {
@@ -1158,6 +1328,10 @@ class _ModernMessageInputState extends State<_ModernMessageInput> {
 
   @override
   void dispose() {
+    _typingTimer?.cancel();
+    if (_isTyping) {
+      _notifyTypingStatus(false);
+    }
     _messageController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -1168,6 +1342,13 @@ class _ModernMessageInputState extends State<_ModernMessageInput> {
     if (text.isNotEmpty) {
       HapticFeedback.lightImpact();
       final correlationId = _uuid.v4();
+
+      // Stop typing indicator
+      if (_isTyping) {
+        _isTyping = false;
+        _notifyTypingStatus(false);
+      }
+
       context.read<ChatMessagesBloc>().add(
         SendNewMessage(content: text, correlationId: correlationId),
       );
@@ -1196,239 +1377,124 @@ class _ModernMessageInputState extends State<_ModernMessageInput> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).primaryColor;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0B1426) : const Color(0xFFF7F8FC),
-        border: Border(
-          top: BorderSide(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-            width: 1,
+    return Column(
+      children: [
+        // Typing indicator
+        _TypingIndicator(
+          chatId: widget.chatId,
+          currentUserId: widget.currentUserId,
+        ),
+
+        // Message input
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0B1426) : const Color(0xFFF7F8FC),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
+            ),
           ),
-        ),
-      ),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: widget.isDesktop ? 24 : 16,
-          vertical: widget.isDesktop ? 16 : 12,
-        ),
-        child: SafeArea(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (!_showSendButton) ...[
-                Container(
-                  margin: EdgeInsets.only(bottom: widget.isDesktop ? 4 : 2),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.circular(
-                      widget.isDesktop ? 16 : 14,
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.isDesktop ? 24 : 16,
+              vertical: widget.isDesktop ? 16 : 12,
+            ),
+            child: Row(
+              children: [
+                // Message input field
+                Expanded(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxHeight: widget.isDesktop ? 120 : 100,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.3),
-                        blurRadius: widget.isDesktop ? 8 : 6,
-                        offset: const Offset(0, 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      borderRadius: BorderRadius.circular(
+                        widget.isDesktop ? 24 : 20,
                       ),
-                    ],
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.attach_file_rounded,
-                      color: Colors.white,
-                      size: widget.isDesktop ? 20 : 18,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'قابلیت ارسال فایل به زودی اضافه خواهد شد.',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                          backgroundColor: primaryColor,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                          elevation: 0,
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-                SizedBox(width: widget.isDesktop ? 12 : 8),
-              ],
-              Expanded(
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxHeight: widget.isDesktop ? 140 : 120,
-                    minHeight: widget.isDesktop ? 56 : 48,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(
-                      widget.isDesktop ? 20 : 16,
-                    ),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF334155)
-                          : const Color(0xFFE2E8F0),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(
-                          widget.isDesktop ? 0.06 : 0.04,
-                        ),
-                        blurRadius: widget.isDesktop ? 12 : 8,
-                        offset: const Offset(0, 2),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF475569)
+                            : const Color(0xFFE2E8F0),
+                        width: 1,
                       ),
-                    ],
-                  ),
-                  child: KeyboardListener(
-                    focusNode: FocusNode(),
-                    onKeyEvent: _handleKeyEvent,
+                    ),
                     child: TextField(
                       controller: _messageController,
                       focusNode: _focusNode,
                       textDirection: _textDirection,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
                       style: TextStyle(
-                        fontSize: widget.isDesktop ? 18 : 16,
+                        fontSize: widget.isDesktop ? 16 : 14,
                         color: isDark ? Colors.white : Colors.black87,
-                        height: 1.4,
-                        fontWeight: FontWeight.w500,
                       ),
                       decoration: InputDecoration(
-                        hintText: "پیام خود را بنویسید...",
+                        hintText: 'پیام خود را بنویسید...',
                         hintStyle: TextStyle(
-                          color: isDark ? Colors.white38 : Colors.black38,
-                          fontSize: widget.isDesktop ? 18 : 16,
-                          fontWeight: FontWeight.w400,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(
-                          vertical: widget.isDesktop ? 18 : 16,
                           horizontal: widget.isDesktop ? 20 : 16,
+                          vertical: widget.isDesktop ? 16 : 12,
                         ),
-                        isDense: false,
                       ),
-                      textCapitalization: TextCapitalization.sentences,
-                      maxLines: widget.isDesktop ? 6 : 5,
-                      minLines: 1,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: widget.isDesktop
-                          ? TextInputAction.send
-                          : TextInputAction.newline,
-                      onSubmitted: widget.isDesktop
-                          ? (_) => _sendMessage()
-                          : null,
+                      onSubmitted: (_) {
+                        if (widget.isDesktop) {
+                          _sendMessage();
+                        }
+                      },
                     ),
                   ),
                 ),
-              ),
-              SizedBox(width: widget.isDesktop ? 16 : 10),
-              Container(
-                margin: EdgeInsets.only(bottom: widget.isDesktop ? 4 : 2),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _showSendButton
-                        ? _sendMessage
-                        : () {
-                            HapticFeedback.lightImpact();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline_rounded,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                    SizedBox(width: 12),
-                                    Text(
-                                      'قابلیت ارسال پیام صوتی به زودی اضافه خواهد شد.',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                backgroundColor: primaryColor,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                margin: const EdgeInsets.all(16),
-                                elevation: 0,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
+
+                SizedBox(width: widget.isDesktop ? 16 : 12),
+
+                // Send button
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: widget.isDesktop ? 56 : 48,
+                  height: widget.isDesktop ? 56 : 48,
+                  decoration: BoxDecoration(
+                    color: _showSendButton
+                        ? primaryColor
+                        : (isDark
+                              ? const Color(0xFF475569)
+                              : const Color(0xFFE2E8F0)),
                     borderRadius: BorderRadius.circular(
-                      widget.isDesktop ? 20 : 16,
+                      widget.isDesktop ? 28 : 24,
                     ),
-                    child: Container(
-                      width: widget.isDesktop ? 56 : 48,
-                      height: widget.isDesktop ? 56 : 48,
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        borderRadius: BorderRadius.circular(
-                          widget.isDesktop ? 20 : 16,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryColor.withOpacity(0.3),
-                            blurRadius: widget.isDesktop ? 12 : 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          transitionBuilder: (child, animation) {
-                            return ScaleTransition(
-                              scale: animation,
-                              child: child,
-                            );
-                          },
-                          child: _showSendButton
-                              ? Icon(
-                                  Icons.send_rounded,
-                                  color: Colors.white,
-                                  size: widget.isDesktop ? 24 : 20,
-                                  key: const ValueKey('send'),
-                                )
-                              : Icon(
-                                  Icons.mic_rounded,
-                                  color: Colors.white,
-                                  size: widget.isDesktop ? 26 : 22,
-                                  key: const ValueKey('mic'),
-                                ),
-                        ),
-                      ),
+                    boxShadow: _showSendButton
+                        ? [
+                            BoxShadow(
+                              color: primaryColor.withOpacity(0.3),
+                              blurRadius: widget.isDesktop ? 12 : 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.send_rounded,
+                      color: _showSendButton
+                          ? Colors.white
+                          : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                      size: widget.isDesktop ? 24 : 20,
                     ),
+                    onPressed: _showSendButton ? _sendMessage : null,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

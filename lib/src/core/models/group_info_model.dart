@@ -1,30 +1,30 @@
 import 'package:equatable/equatable.dart';
 
-enum GroupRole { member, admin, owner }
+enum GroupRole { owner, admin, member }
 
 class GroupInfoModel extends Equatable {
   final String id;
   final String title;
   final String? description;
-  final String? groupImageUrl;
-  final int ownerId;
+  final String? avatarUrl;
   final String ownerName;
+  final long ownerId;
   final DateTime createdAt;
   final int membersCount;
-  final GroupSettingsModel settings;
   final List<GroupMemberModel> members;
+  final GroupSettingsModel settings;
 
   const GroupInfoModel({
     required this.id,
     required this.title,
     this.description,
-    this.groupImageUrl,
-    required this.ownerId,
+    this.avatarUrl,
     required this.ownerName,
+    required this.ownerId,
     required this.createdAt,
     required this.membersCount,
-    required this.settings,
     required this.members,
+    required this.settings,
   });
 
   factory GroupInfoModel.fromJson(Map<String, dynamic> json) {
@@ -32,21 +32,39 @@ class GroupInfoModel extends Equatable {
       id: json['id'] as String,
       title: json['title'] as String,
       description: json['description'] as String?,
-      groupImageUrl: json['groupImageUrl'] as String?,
-      ownerId: json['ownerId'] as int,
+      avatarUrl: json['avatarUrl'] as String?,
       ownerName: json['ownerName'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      ownerId: json['ownerId'] as int,
+      createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       membersCount: json['membersCount'] as int,
+      members:
+          (json['members'] as List<dynamic>?)
+              ?.map(
+                (memberJson) => GroupMemberModel.fromJson(
+                  memberJson as Map<String, dynamic>,
+                ),
+              )
+              .toList() ??
+          [],
       settings: GroupSettingsModel.fromJson(
         json['settings'] as Map<String, dynamic>,
       ),
-      members: (json['members'] as List<dynamic>)
-          .map(
-            (member) =>
-                GroupMemberModel.fromJson(member as Map<String, dynamic>),
-          )
-          .toList(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'avatarUrl': avatarUrl,
+      'ownerName': ownerName,
+      'ownerId': ownerId,
+      'createdAt': createdAt.toIso8601String(),
+      'membersCount': membersCount,
+      'members': members.map((member) => member.toJson()).toList(),
+      'settings': settings.toJson(),
+    };
   }
 
   @override
@@ -54,39 +72,18 @@ class GroupInfoModel extends Equatable {
     id,
     title,
     description,
-    groupImageUrl,
-    ownerId,
+    avatarUrl,
     ownerName,
+    ownerId,
     createdAt,
     membersCount,
-    settings,
     members,
+    settings,
   ];
-
-  GroupInfoModel copyWith({
-    String? title,
-    String? description,
-    String? groupImageUrl,
-    GroupSettingsModel? settings,
-    List<GroupMemberModel>? members,
-  }) {
-    return GroupInfoModel(
-      id: id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      groupImageUrl: groupImageUrl ?? this.groupImageUrl,
-      ownerId: ownerId,
-      ownerName: ownerName,
-      createdAt: createdAt,
-      membersCount: members?.length ?? membersCount,
-      settings: settings ?? this.settings,
-      members: members ?? this.members,
-    );
-  }
 }
 
 class GroupMemberModel extends Equatable {
-  final int userId;
+  final int id;
   final String username;
   final String? firstName;
   final String? lastName;
@@ -94,10 +91,10 @@ class GroupMemberModel extends Equatable {
   final GroupRole role;
   final DateTime joinedAt;
   final bool isOnline;
-  final DateTime? lastSeen;
+  final DateTime? lastActive;
 
   const GroupMemberModel({
-    required this.userId,
+    required this.id,
     required this.username,
     this.firstName,
     this.lastName,
@@ -105,46 +102,52 @@ class GroupMemberModel extends Equatable {
     required this.role,
     required this.joinedAt,
     required this.isOnline,
-    this.lastSeen,
+    this.lastActive,
   });
-
-  factory GroupMemberModel.fromJson(Map<String, dynamic> json) {
-    return GroupMemberModel(
-      userId: json['userId'] as int,
-      username: json['username'] as String,
-      firstName: json['firstName'] as String?,
-      lastName: json['lastName'] as String?,
-      profilePictureUrl: json['profilePictureUrl'] as String?,
-      role: GroupRole.values[json['role'] as int],
-      joinedAt: DateTime.parse(json['joinedAt'] as String),
-      isOnline: json['isOnline'] as bool,
-      lastSeen: json['lastSeen'] != null
-          ? DateTime.parse(json['lastSeen'] as String)
-          : null,
-    );
-  }
 
   String get displayName {
     if (firstName != null && lastName != null) {
-      return '$firstName $lastName'.trim();
+      return '$firstName $lastName';
     }
     return username;
   }
 
-  String get roleTitle {
-    switch (role) {
-      case GroupRole.owner:
-        return 'مالک گروه';
-      case GroupRole.admin:
-        return 'ادمین';
-      case GroupRole.member:
-        return 'عضو';
-    }
+  factory GroupMemberModel.fromJson(Map<String, dynamic> json) {
+    return GroupMemberModel(
+      id: json['id'] as int,
+      username: json['username'] as String,
+      firstName: json['firstName'] as String?,
+      lastName: json['lastName'] as String?,
+      profilePictureUrl: json['profilePictureUrl'] as String?,
+      role: GroupRole.values.firstWhere(
+        (e) => e.toString().split('.').last == json['role'],
+        orElse: () => GroupRole.member,
+      ),
+      joinedAt: DateTime.parse(json['joinedAt'] as String).toLocal(),
+      isOnline: json['isOnline'] as bool? ?? false,
+      lastActive: json['lastActive'] != null
+          ? DateTime.parse(json['lastActive'] as String).toLocal()
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      'firstName': firstName,
+      'lastName': lastName,
+      'profilePictureUrl': profilePictureUrl,
+      'role': role.toString().split('.').last,
+      'joinedAt': joinedAt.toIso8601String(),
+      'isOnline': isOnline,
+      'lastActive': lastActive?.toIso8601String(),
+    };
   }
 
   @override
   List<Object?> get props => [
-    userId,
+    id,
     username,
     firstName,
     lastName,
@@ -152,63 +155,95 @@ class GroupMemberModel extends Equatable {
     role,
     joinedAt,
     isOnline,
-    lastSeen,
+    lastActive,
   ];
 }
 
 class GroupSettingsModel extends Equatable {
+  final int maxMembers;
   final bool onlyAdminsCanSendMessages;
   final bool onlyAdminsCanAddMembers;
-  final bool onlyAdminsCanEditGroupInfo;
-  final int maxMembers;
+  final bool onlyAdminsCanEditInfo;
+  final bool onlyAdminsCanDeleteMessages;
+  final bool allowMemberToLeave;
+  final bool isPublic;
+  final String? joinLink;
 
   const GroupSettingsModel({
+    required this.maxMembers,
     required this.onlyAdminsCanSendMessages,
     required this.onlyAdminsCanAddMembers,
-    required this.onlyAdminsCanEditGroupInfo,
-    required this.maxMembers,
+    required this.onlyAdminsCanEditInfo,
+    required this.onlyAdminsCanDeleteMessages,
+    required this.allowMemberToLeave,
+    required this.isPublic,
+    this.joinLink,
   });
 
   factory GroupSettingsModel.fromJson(Map<String, dynamic> json) {
     return GroupSettingsModel(
-      onlyAdminsCanSendMessages: json['onlyAdminsCanSendMessages'] as bool,
-      onlyAdminsCanAddMembers: json['onlyAdminsCanAddMembers'] as bool,
-      onlyAdminsCanEditGroupInfo: json['onlyAdminsCanEditGroupInfo'] as bool,
-      maxMembers: json['maxMembers'] as int,
+      maxMembers: json['maxMembers'] as int? ?? 256,
+      onlyAdminsCanSendMessages:
+          json['onlyAdminsCanSendMessages'] as bool? ?? false,
+      onlyAdminsCanAddMembers:
+          json['onlyAdminsCanAddMembers'] as bool? ?? false,
+      onlyAdminsCanEditInfo: json['onlyAdminsCanEditInfo'] as bool? ?? true,
+      onlyAdminsCanDeleteMessages:
+          json['onlyAdminsCanDeleteMessages'] as bool? ?? true,
+      allowMemberToLeave: json['allowMemberToLeave'] as bool? ?? true,
+      isPublic: json['isPublic'] as bool? ?? false,
+      joinLink: json['joinLink'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'maxMembers': maxMembers,
       'onlyAdminsCanSendMessages': onlyAdminsCanSendMessages,
       'onlyAdminsCanAddMembers': onlyAdminsCanAddMembers,
-      'onlyAdminsCanEditGroupInfo': onlyAdminsCanEditGroupInfo,
-      'maxMembers': maxMembers,
+      'onlyAdminsCanEditInfo': onlyAdminsCanEditInfo,
+      'onlyAdminsCanDeleteMessages': onlyAdminsCanDeleteMessages,
+      'allowMemberToLeave': allowMemberToLeave,
+      'isPublic': isPublic,
+      'joinLink': joinLink,
     };
   }
 
-  @override
-  List<Object> get props => [
-    onlyAdminsCanSendMessages,
-    onlyAdminsCanAddMembers,
-    onlyAdminsCanEditGroupInfo,
-    maxMembers,
-  ];
-
   GroupSettingsModel copyWith({
+    int? maxMembers,
     bool? onlyAdminsCanSendMessages,
     bool? onlyAdminsCanAddMembers,
-    bool? onlyAdminsCanEditGroupInfo,
-    int? maxMembers,
+    bool? onlyAdminsCanEditInfo,
+    bool? onlyAdminsCanDeleteMessages,
+    bool? allowMemberToLeave,
+    bool? isPublic,
+    String? joinLink,
   }) {
     return GroupSettingsModel(
+      maxMembers: maxMembers ?? this.maxMembers,
       onlyAdminsCanSendMessages:
           onlyAdminsCanSendMessages ?? this.onlyAdminsCanSendMessages,
       onlyAdminsCanAddMembers:
           onlyAdminsCanAddMembers ?? this.onlyAdminsCanAddMembers,
-      onlyAdminsCanEditGroupInfo:
-          onlyAdminsCanEditGroupInfo ?? this.onlyAdminsCanEditGroupInfo,
-      maxMembers: maxMembers ?? this.maxMembers,
+      onlyAdminsCanEditInfo:
+          onlyAdminsCanEditInfo ?? this.onlyAdminsCanEditInfo,
+      onlyAdminsCanDeleteMessages:
+          onlyAdminsCanDeleteMessages ?? this.onlyAdminsCanDeleteMessages,
+      allowMemberToLeave: allowMemberToLeave ?? this.allowMemberToLeave,
+      isPublic: isPublic ?? this.isPublic,
+      joinLink: joinLink ?? this.joinLink,
     );
   }
+
+  @override
+  List<Object?> get props => [
+    maxMembers,
+    onlyAdminsCanSendMessages,
+    onlyAdminsCanAddMembers,
+    onlyAdminsCanEditInfo,
+    onlyAdminsCanDeleteMessages,
+    allowMemberToLeave,
+    isPublic,
+    joinLink,
+  ];
 }
