@@ -729,9 +729,9 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
 
     final member = groupInfo.members.firstWhere(
       (m) => m.id == userId,
-      orElse: () => const GroupMemberModel(
-        id: 0,
-        userId: 0,
+      orElse: () => GroupMemberModel(
+        id: -1,
+        userId: -1,
         username: '',
         role: GroupRole.member,
         joinedAt: DateTime.now(),

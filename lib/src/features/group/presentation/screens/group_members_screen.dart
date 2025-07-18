@@ -6,7 +6,7 @@ import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_members_bloc.dart';
 import 'package:solvix/src/features/group/presentation/widgets/group_avatar.dart';
 import 'package:solvix/src/features/group/presentation/widgets/role_badge.dart';
-
+import 'package:solvix/src/core/api/user/user_service.dart';
 class GroupMembersScreen extends StatefulWidget {
   final String chatId;
   final GroupInfoModel groupInfo;
@@ -219,7 +219,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
             const SizedBox(height: 4),
             Row(
               children: [
-                _buildRoleBadge(member.role),
+                // استفاده از RoleBadge widget بجای _buildRoleBadge
+                RoleBadge(role: member.role),
                 const SizedBox(width: 8),
                 Text(
                   '@${member.username}',
@@ -277,7 +278,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                       child: Row(
                         children: [
                           Icon(Icons.star, color: Colors.amber),
-                          // ⭐ تغییر از crown به star
                           SizedBox(width: 8),
                           Text('انتقال مالکیت'),
                         ],
@@ -299,54 +299,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 ],
               )
             : null,
-      ),
-    );
-  }
-
-  Widget _buildRoleBadge(GroupRole role) {
-    Color color;
-    String text;
-    IconData icon;
-
-    switch (role) {
-      case GroupRole.owner:
-        color = Colors.amber;
-        text = 'مالک';
-        icon = Icons.star; // ⭐ تغییر از crown به star
-        break;
-      case GroupRole.admin:
-        color = Colors.blue;
-        text = 'ادمین';
-        icon = Icons.admin_panel_settings;
-        break;
-      case GroupRole.member:
-        color = Colors.grey;
-        text = 'عضو';
-        icon = Icons.person;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -519,18 +471,15 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   GroupRole? _getCurrentUserRole() {
     if (widget.currentUser == null) return null;
 
-    final currentMember = widget.groupInfo.members.firstWhere(
-      (member) => member.userId == widget.currentUser!.id,
-      orElse: () => GroupMemberModel(
-        userId: -1,
-        username: '',
-        role: GroupRole.member,
-        joinedAt: DateTime.now(),
-        isOnline: false,
-      ),
-    );
-
-    return currentMember.userId != -1 ? currentMember.role : null;
+    try {
+      final currentMember = widget.groupInfo.members.firstWhere(
+        (member) => member.userId == widget.currentUser!.id,
+      );
+      return currentMember.role;
+    } catch (e) {
+      // اگر کاربر فعلی در لیست اعضا نبود
+      return null;
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -606,13 +555,14 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Load users from your contacts/users service
-      // final userService = context.read<UserService>();
-      // final allUsers = await userService.getAllUsers();
-      // _availableUsers = allUsers.where((user) => !widget.existingMemberIds.contains(user.id)).toList();
+      // بارگذاری کاربران از contacts
+      // TODO: پیاده‌سازی لودینگ از UserService یا ContactsService
+      final userService = context.read<UserService>();
+      final allContacts = await userService.getSavedContacts();
 
-      // For now, using dummy data
-      _availableUsers = [];
+      _availableUsers = allContacts
+          .where((contact) => !widget.existingMemberIds.contains(contact.id))
+          .toList();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
