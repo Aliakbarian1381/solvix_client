@@ -2,51 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class GroupAvatar extends StatelessWidget {
-  final String? imageUrl;
-  final String groupName;
+  final String? groupName;
+  final String? title;
+  final String? avatarUrl;
   final double radius;
-  final VoidCallback? onTap;
 
   const GroupAvatar({
     super.key,
-    this.imageUrl,
-    required this.groupName,
+    this.groupName,
+    this.title,
+    this.avatarUrl,
     this.radius = 24,
-    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    Widget avatar = CircleAvatar(
+    final displayName = groupName ?? title ?? 'G';
+
+    return CircleAvatar(
       radius: radius,
-      backgroundColor: Theme
-          .of(context)
-          .primaryColor
-          .withOpacity(0.1),
-      backgroundImage: imageUrl != null
-          ? CachedNetworkImageProvider(imageUrl!)
+      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+      backgroundImage: avatarUrl != null
+          ? CachedNetworkImageProvider(avatarUrl!)
           : null,
-      child: imageUrl == null
+      child: avatarUrl == null
           ? Text(
-        groupName.isNotEmpty ? groupName[0].toUpperCase() : 'G',
+        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'G',
         style: TextStyle(
-          color: Theme
-              .of(context)
-              .primaryColor,
+          color: Theme.of(context).primaryColor,
           fontWeight: FontWeight.bold,
-          fontSize: radius * 0.6,
+          fontSize: radius * 0.8,
         ),
       )
           : null,
     );
-
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: avatar,
-      );
-    }
-
-    return avatar;
   }
 }

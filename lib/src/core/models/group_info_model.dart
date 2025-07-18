@@ -84,6 +84,7 @@ class GroupInfoModel extends Equatable {
 
 class GroupMemberModel extends Equatable {
   final int id;
+  final int userId;
   final String username;
   final String? firstName;
   final String? lastName;
@@ -95,6 +96,7 @@ class GroupMemberModel extends Equatable {
 
   const GroupMemberModel({
     required this.id,
+    required this.userId,
     required this.username,
     this.firstName,
     this.lastName,
@@ -112,9 +114,13 @@ class GroupMemberModel extends Equatable {
     return username;
   }
 
+  DateTime? get lastSeen => lastActive;
+
   factory GroupMemberModel.fromJson(Map<String, dynamic> json) {
     return GroupMemberModel(
       id: json['id'] as int,
+      userId: json['userId'] as int? ?? json['id'] as int,
+      // fallback
       username: json['username'] as String,
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
@@ -134,6 +140,7 @@ class GroupMemberModel extends Equatable {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'userId': userId,
       'username': username,
       'firstName': firstName,
       'lastName': lastName,
@@ -148,6 +155,7 @@ class GroupMemberModel extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    userId,
     username,
     firstName,
     lastName,
@@ -180,6 +188,8 @@ class GroupSettingsModel extends Equatable {
     this.joinLink,
   });
 
+  bool get onlyAdminsCanEditGroupInfo => onlyAdminsCanEditInfo;
+
   factory GroupSettingsModel.fromJson(Map<String, dynamic> json) {
     return GroupSettingsModel(
       maxMembers: json['maxMembers'] as int? ?? 256,
@@ -187,7 +197,10 @@ class GroupSettingsModel extends Equatable {
           json['onlyAdminsCanSendMessages'] as bool? ?? false,
       onlyAdminsCanAddMembers:
           json['onlyAdminsCanAddMembers'] as bool? ?? false,
-      onlyAdminsCanEditInfo: json['onlyAdminsCanEditInfo'] as bool? ?? true,
+      onlyAdminsCanEditInfo:
+          json['onlyAdminsCanEditInfo'] as bool? ??
+          json['onlyAdminsCanEditGroupInfo'] as bool? ??
+          true,
       onlyAdminsCanDeleteMessages:
           json['onlyAdminsCanDeleteMessages'] as bool? ?? true,
       allowMemberToLeave: json['allowMemberToLeave'] as bool? ?? true,

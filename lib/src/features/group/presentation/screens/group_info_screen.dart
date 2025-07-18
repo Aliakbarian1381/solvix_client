@@ -240,10 +240,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     );
   }
 
-  Widget _buildHeaderBackground(
-    BuildContext context,
-    GroupInfoModel groupInfo,
-  ) {
+  Widget _buildHeaderBackground(BuildContext context, GroupInfoModel groupInfo) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -257,15 +254,16 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       ),
       child: Stack(
         children: [
-          // Background pattern
-          Positioned.fill(child: CustomPaint(painter: _PatternPainter())),
-
-          // Group avatar
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _PatternPainter(),
+            ),
+          ),
           Center(
             child: Hero(
               tag: 'group_avatar_${groupInfo.id}',
               child: GroupAvatar(
-                groupName: groupInfo.title,
+                title: groupInfo.title, // استفاده از title
                 avatarUrl: groupInfo.avatarUrl,
                 radius: 48,
               ),
@@ -733,9 +731,10 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       (m) => m.id == userId,
       orElse: () => const GroupMemberModel(
         id: 0,
+        userId: 0,
         username: '',
         role: GroupRole.member,
-        joinedAt: null,
+        joinedAt: DateTime.now(),
         isOnline: false,
       ),
     );
