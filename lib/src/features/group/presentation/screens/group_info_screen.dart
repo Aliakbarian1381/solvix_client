@@ -265,7 +265,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
             child: Hero(
               tag: 'group_avatar_${groupInfo.id}',
               child: GroupAvatar(
-                title: groupInfo.title,
+                groupName: groupInfo.title,
                 avatarUrl: groupInfo.avatarUrl,
                 radius: 48,
               ),

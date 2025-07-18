@@ -8,7 +8,7 @@ class GroupInfoModel extends Equatable {
   final String? description;
   final String? avatarUrl;
   final String ownerName;
-  final long ownerId;
+  final int ownerId;
   final DateTime createdAt;
   final int membersCount;
   final List<GroupMemberModel> members;

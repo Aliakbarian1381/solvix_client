@@ -137,9 +137,8 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
                     CircleAvatar(
                       radius: 50,
                       backgroundColor: Colors.grey[200],
-                      backgroundImage: _getGroupImage(),
-                      child: _getGroupImage() == null
-                          ? Icon(Icons.group, size: 40, color: Colors.grey[600])
+                      backgroundImage: widget.groupInfo.avatarUrl != null
+                          ? CachedNetworkImageProvider(widget.groupInfo.avatarUrl!)
                           : null,
                     ),
                     Positioned(
@@ -263,8 +262,8 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
   ImageProvider? _getGroupImage() {
     if (_selectedImage != null) {
       return FileImage(_selectedImage!);
-    } else if (widget.groupInfo.groupImageUrl != null) {
-      return CachedNetworkImageProvider(widget.groupInfo.groupImageUrl!);
+    } else if (widget.groupInfo.avatarUrl != null) {
+      return CachedNetworkImageProvider(widget.groupInfo.avatarUrl!);
     }
     return null;
   }
@@ -292,7 +291,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
                 _getImageFromSource(ImageSource.gallery);
               },
             ),
-            if (widget.groupInfo.groupImageUrl != null ||
+            if (widget.groupInfo.avatarUrl != null ||
                 _selectedImage != null)
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),

@@ -21,6 +21,9 @@ import '../../../../utils/date_formatter.dart';
 import 'package:solvix/src/features/group/presentation/screens/group_info_screen.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_info_bloc.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_members_bloc.dart';
+import 'package:solvix/src/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:solvix/src/features/auth/presentation/bloc/auth_state.dart' as auth_states;
+
 
 class ChatScreen extends StatefulWidget {
   final ChatModel chatModel;
@@ -1077,7 +1080,7 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   UserModel? _getCurrentUser(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) {
+    if (authState is auth_states.AuthSuccess) {
       return authState.user;
     }
     return null;
