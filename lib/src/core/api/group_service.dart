@@ -4,7 +4,7 @@ import 'package:solvix/src/core/models/group_info_model.dart';
 import 'package:solvix/src/core/services/storage_service.dart';
 
 class GroupService {
-  final String _baseUrl = 'https://your-api-url.com'; // ⭐ آدرس API شما
+  final String _baseUrl = 'https://api.solvix.ir';
   final StorageService _storageService;
 
   GroupService(this._storageService);

@@ -114,7 +114,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     GroupInfoModel groupInfo,
   ) {
     final theme = Theme.of(context);
-    final currentUserRole = _getCurrentUserRole(groupInfo);
+    final currentUserRole = _getCurrentUserRole(groupInfo, widget.currentUser);
     final isOwner = currentUserRole == GroupRole.owner;
     final isAdmin = currentUserRole == GroupRole.admin || isOwner;
 

@@ -83,6 +83,7 @@ Future<void> main() async {
   final userService = UserService(dio, storageService);
   final searchService = SearchService();
   final notificationService = NotificationService(userService);
+  final groupService = GroupService(storageService);
 
   // Create Blocs
   final authBloc = AuthBloc(authService, storageService);
@@ -99,6 +100,7 @@ Future<void> main() async {
         RepositoryProvider.value(value: userService),
         RepositoryProvider.value(value: searchService),
         RepositoryProvider.value(value: notificationService),
+        RepositoryProvider.value(value: groupService),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -111,10 +113,10 @@ Future<void> main() async {
             lazy: false,
           ),
           BlocProvider<GroupInfoBloc>(
-            create: (context) => GroupInfoBloc(GroupService(context.read<StorageService>())),
+            create: (context) => GroupInfoBloc(groupService),
           ),
           BlocProvider<GroupMembersBloc>(
-            create: (context) => GroupMembersBloc(GroupService(context.read<StorageService>())),
+            create: (context) => GroupMembersBloc(groupService),
           ),
           BlocProvider<AppBloc>(
             create: (context) => AppBloc(

@@ -43,8 +43,9 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       appBar: AppBar(
         title: Text('اعضای گروه (${widget.groupInfo.membersCount})'),
         actions: [
-          if (isAdmin && widget.groupInfo.membersCount <
-              widget.groupInfo.settings.maxMembers)
+          if (isAdmin &&
+              widget.groupInfo.membersCount <
+                  widget.groupInfo.settings.maxMembers)
             IconButton(
               onPressed: _addMembers,
               icon: const Icon(Icons.person_add),
@@ -84,25 +85,19 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Colors.red[300],
-                  ),
+                  Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
                   const SizedBox(height: 16),
                   Text(
                     state.message,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () {
                       context.read<GroupMembersBloc>().add(
-                          LoadGroupMembers(widget.chatId));
+                        LoadGroupMembers(widget.chatId),
+                      );
                     },
                     icon: const Icon(Icons.refresh),
                     label: const Text('تلاش مجدد'),
@@ -118,14 +113,17 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     );
   }
 
-  Widget _buildMembersList(BuildContext context,
-      List<GroupMemberModel> members) {
+  Widget _buildMembersList(
+    BuildContext context,
+    List<GroupMemberModel> members,
+  ) {
     // Sort members: Owner first, then Admins, then Members
     final sortedMembers = List<GroupMemberModel>.from(members);
     sortedMembers.sort((a, b) {
       if (a.role != b.role) {
         return b.role.index.compareTo(
-            a.role.index); // Owner=2, Admin=1, Member=0
+          a.role.index,
+        ); // Owner=2, Admin=1, Member=0
       }
       return a.displayName.compareTo(b.displayName);
     });
@@ -142,8 +140,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   Widget _buildMemberTile(BuildContext context, GroupMemberModel member) {
     final theme = Theme.of(context);
     final isCurrentUser = member.userId == widget.currentUser?.id;
-    final canManage = isAdmin && !isCurrentUser &&
-        member.role != GroupRole.owner;
+    final canManage =
+        isAdmin && !isCurrentUser && member.role != GroupRole.owner;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -159,15 +157,15 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                   : null,
               child: member.profilePictureUrl == null
                   ? Text(
-                member.displayName.isNotEmpty
-                    ? member.displayName[0].toUpperCase()
-                    : 'U',
-                style: TextStyle(
-                  color: theme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              )
+                      member.displayName.isNotEmpty
+                          ? member.displayName[0].toUpperCase()
+                          : 'U',
+                      style: TextStyle(
+                        color: theme.primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    )
                   : null,
             ),
             if (member.isOnline)
@@ -225,10 +223,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 const SizedBox(width: 8),
                 Text(
                   '@${member.username}',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
             ),
@@ -245,62 +240,64 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
             const SizedBox(height: 4),
             Text(
               'عضو از: ${_formatDate(member.joinedAt)}',
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey[500], fontSize: 12),
             ),
           ],
         ),
         trailing: canManage
             ? PopupMenuButton<String>(
-          onSelected: (value) => _handleMemberAction(context, value, member),
-          itemBuilder: (context) => [
-            if (member.role == GroupRole.member && isOwner)
-              const PopupMenuItem(
-                value: 'promote_admin',
-                child: Row(
-                  children: [
-                    Icon(Icons.admin_panel_settings, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Text('ارتقا به ادمین'),
-                  ],
-                ),
-              ),
-            if (member.role == GroupRole.admin && isOwner)
-              const PopupMenuItem(
-                value: 'demote_member',
-                child: Row(
-                  children: [
-                    Icon(Icons.remove_moderator, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Text('تنزل به عضو'),
-                  ],
-                ),
-              ),
-            if (isOwner && member.role != GroupRole.owner)
-              const PopupMenuItem(
-                value: 'transfer_ownership',
-                child: Row(
-                  children: [
-                    Icon(Icons.star, color: Colors.amber), // ⭐ تغییر از crown به star
-                    SizedBox(width: 8),
-                    Text('انتقال مالکیت'),
-                  ],
-                ),
-              ),
-            const PopupMenuItem(
-              value: 'remove',
-              child: Row(
-                children: [
-                  Icon(Icons.person_remove, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('حذف از گروه', style: TextStyle(color: Colors.red)),
+                onSelected: (value) =>
+                    _handleMemberAction(context, value, member),
+                itemBuilder: (context) => [
+                  if (member.role == GroupRole.member && isOwner)
+                    const PopupMenuItem(
+                      value: 'promote_admin',
+                      child: Row(
+                        children: [
+                          Icon(Icons.admin_panel_settings, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('ارتقا به ادمین'),
+                        ],
+                      ),
+                    ),
+                  if (member.role == GroupRole.admin && isOwner)
+                    const PopupMenuItem(
+                      value: 'demote_member',
+                      child: Row(
+                        children: [
+                          Icon(Icons.remove_moderator, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('تنزل به عضو'),
+                        ],
+                      ),
+                    ),
+                  if (isOwner && member.role != GroupRole.owner)
+                    const PopupMenuItem(
+                      value: 'transfer_ownership',
+                      child: Row(
+                        children: [
+                          Icon(Icons.star, color: Colors.amber),
+                          // ⭐ تغییر از crown به star
+                          SizedBox(width: 8),
+                          Text('انتقال مالکیت'),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'remove',
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_remove, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text(
+                          'حذف از گروه',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
-            ),
-          ],
-        )
+              )
             : null,
       ),
     );
@@ -354,8 +351,11 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     );
   }
 
-  void _handleMemberAction(BuildContext context, String action,
-      GroupMemberModel member) {
+  void _handleMemberAction(
+    BuildContext context,
+    String action,
+    GroupMemberModel member,
+  ) {
     switch (action) {
       case 'promote_admin':
         _showPromoteDialog(context, member);
@@ -375,144 +375,122 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   void _showPromoteDialog(BuildContext context, GroupMemberModel member) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: const Text('ارتقا به ادمین'),
-            content: Text(
-              'آیا می‌خواهید ${member.displayName} را به ادمین ارتقا دهید؟',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('انصراف'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.read<GroupMembersBloc>().add(
-                    UpdateMemberRole(
-                      chatId: widget.chatId,
-                      memberId: member.userId,
-                      newRole: GroupRole.admin,
-                    ),
-                  );
-                },
-                child: const Text('ارتقا'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('ارتقا به ادمین'),
+        content: Text(
+          'آیا می‌خواهید ${member.displayName} را به ادمین ارتقا دهید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('انصراف'),
           ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<GroupMembersBloc>().add(
+                UpdateMemberRole(
+                  chatId: widget.chatId,
+                  memberId: member.userId,
+                  newRole: GroupRole.admin,
+                ),
+              );
+            },
+            child: const Text('ارتقا'),
+          ),
+        ],
+      ),
     );
   }
 
   void _showDemoteDialog(BuildContext context, GroupMemberModel member) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: const Text('تنزل به عضو'),
-            content: Text(
-              'آیا می‌خواهید ${member.displayName} را به عضو عادی تنزل دهید؟',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('انصراف'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.read<GroupMembersBloc>().add(
-                    UpdateMemberRole(
-                      chatId: widget.chatId,
-                      memberId: member.userId,
-                      newRole: GroupRole.member,
-                    ),
-                  );
-                },
-                child: const Text('تنزل'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('تنزل به عضو'),
+        content: Text(
+          'آیا می‌خواهید ${member.displayName} را به عضو عادی تنزل دهید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('انصراف'),
           ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<GroupMembersBloc>().add(
+                UpdateMemberRole(
+                  chatId: widget.chatId,
+                  memberId: member.userId,
+                  newRole: GroupRole.member,
+                ),
+              );
+            },
+            child: const Text('تنزل'),
+          ),
+        ],
+      ),
     );
   }
 
-  void _showTransferOwnershipDialog(BuildContext context,
-      GroupMemberModel member) {
+  void _showTransferOwnershipDialog(
+    BuildContext context,
+    GroupMemberModel member,
+  ) {
     showDialog(
-        context: context,
-        builder: (context) =>
-            AlertDialog(
-                title: const Text('انتقال مالکیت'),
-                content: Text(
-                  'آیا مطمئن هستید که می‌خواهید مالکیت گروه را به ${member
-                      .displayName} منتقل کنید؟ این عمل قابل بازگشت نیست.',
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('انتقال مالکیت'),
+        content: Text(
+          'آیا مطمئن هستید که می‌خواهید مالکیت گروه را به ${member.displayName} منتقل کنید؟ این عمل قابل بازگشت نیست.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('انصراف'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<GroupMembersBloc>().add(
+                TransferOwnership(
+                  chatId: widget.chatId,
+                  newOwnerId: member.userId,
                 ),
-                actions: [
-                TextButton(
-                onPressed: () => Navigator.pop(context),
-    child: const Text('انصراف'),
-    ),
-    TextButton(
-    onPressed: () {
-    Navigator.pop(context);
-    context.read<GroupMembersBloc>().add(
-    TransferOwnership(
-    chatId: widget.chatId,
-    newOwnerId: member.userId,
-    ),
-    );
-    },
-    TextButton(
-    onPressed: () {
-    Navigator.pop(context);
-    context.read<GroupMembersBloc>().add(
-    TransferOwnership(
-    chatId: widget.chatId,
-    newOwnerId: member.userId,
-    ),
-    );
-    },
-    child: const Text(
-    'انتقال',
-    style: TextStyle(color: Colors.red),
-    ),
-    ),
-    ],
-    ),
+              );
+            },
+            child: const Text('انتقال', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
   void _showRemoveMemberDialog(BuildContext context, GroupMemberModel member) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: const Text('حذف عضو'),
-            content: Text(
-              'آیا می‌خواهید ${member.displayName} را از گروه حذف کنید؟',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('انصراف'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.read<GroupMembersBloc>().add(
-                    RemoveMember(
-                      chatId: widget.chatId,
-                      memberId: member.userId,
-                    ),
-                  );
-                },
-                child: const Text(
-                  'حذف',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('حذف عضو'),
+        content: Text(
+          'آیا می‌خواهید ${member.displayName} را از گروه حذف کنید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('انصراف'),
           ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<GroupMembersBloc>().add(
+                RemoveMember(chatId: widget.chatId, memberId: member.userId),
+              );
+            },
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -520,22 +498,19 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            AddMembersScreen(
-              chatId: widget.chatId,
-              existingMemberIds: widget.groupInfo.members
-                  .map((m) => m.userId)
-                  .toList(),
-            ),
+        builder: (context) => AddMembersScreen(
+          chatId: widget.chatId,
+          existingMemberIds: widget.groupInfo.members
+              .map((m) => m.userId)
+              .toList(),
+        ),
       ),
     ).then((selectedUserIds) {
-      if (selectedUserIds != null && selectedUserIds is List<int> &&
+      if (selectedUserIds != null &&
+          selectedUserIds is List<int> &&
           selectedUserIds.isNotEmpty) {
         context.read<GroupMembersBloc>().add(
-          AddMembers(
-            chatId: widget.chatId,
-            userIds: selectedUserIds,
-          ),
+          AddMembers(chatId: widget.chatId, userIds: selectedUserIds),
         );
       }
     });
@@ -545,7 +520,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     if (widget.currentUser == null) return null;
 
     final currentMember = widget.groupInfo.members.firstWhere(
-          (member) => member.userId == widget.currentUser!.id,
+      (member) => member.userId == widget.currentUser!.id,
       orElse: () => GroupMemberModel(
         userId: -1,
         username: '',
@@ -640,9 +615,9 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
       _availableUsers = [];
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری کاربران: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('خطا در بارگذاری کاربران: $e')));
       }
     } finally {
       if (mounted) {
@@ -700,16 +675,11 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Theme
-                  .of(context)
-                  .primaryColor
-                  .withOpacity(0.1),
+              color: Theme.of(context).primaryColor.withOpacity(0.1),
               child: Text(
                 '${_selectedUserIds.length} کاربر انتخاب شده',
                 style: TextStyle(
-                  color: Theme
-                      .of(context)
-                      .primaryColor,
+                  color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
@@ -722,77 +692,76 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : filteredUsers.isEmpty
                 ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.person_search, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'هیچ کاربری یافت نشد',
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                ],
-              ),
-            )
-                : ListView.builder(
-              itemCount: filteredUsers.length,
-              itemBuilder: (context, index) {
-                final user = filteredUsers[index];
-                final isSelected = _selectedUserIds.contains(user.id);
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 4),
-                  child: CheckboxListTile(
-                    value: isSelected,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        if (value == true) {
-                          _selectedUserIds.add(user.id);
-                        } else {
-                          _selectedUserIds.remove(user.id);
-                        }
-                      });
-                    },
-                    secondary: CircleAvatar(
-                      backgroundColor: Theme
-                          .of(context)
-                          .primaryColor
-                          .withOpacity(0.1),
-                      backgroundImage: user.profilePictureUrl != null
-                          ? CachedNetworkImageProvider(user.profilePictureUrl!)
-                          : null,
-                      child: user.profilePictureUrl == null
-                          ? Text(
-                        user.firstName?.isNotEmpty == true
-                            ? user.firstName![0].toUpperCase()
-                            : user.username[0].toUpperCase(),
-                        style: TextStyle(
-                          color: Theme
-                              .of(context)
-                              .primaryColor,
-                          fontWeight: FontWeight.bold,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_search, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text(
+                          'هیچ کاربری یافت نشد',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
                         ),
-                      )
-                          : null,
+                      ],
                     ),
-                    title: Text(
-                      '${user.firstName ?? ''} ${user.lastName ?? ''}'
-                          .trim()
-                          .isEmpty
-                          ? user.username
-                          : '${user.firstName ?? ''} ${user.lastName ?? ''}'
-                          .trim(),
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: Text('@${user.username}'),
-                    activeColor: Theme
-                        .of(context)
-                        .primaryColor,
+                  )
+                : ListView.builder(
+                    itemCount: filteredUsers.length,
+                    itemBuilder: (context, index) {
+                      final user = filteredUsers[index];
+                      final isSelected = _selectedUserIds.contains(user.id);
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        child: CheckboxListTile(
+                          value: isSelected,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              if (value == true) {
+                                _selectedUserIds.add(user.id);
+                              } else {
+                                _selectedUserIds.remove(user.id);
+                              }
+                            });
+                          },
+                          secondary: CircleAvatar(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.1),
+                            backgroundImage: user.profilePictureUrl != null
+                                ? CachedNetworkImageProvider(
+                                    user.profilePictureUrl!,
+                                  )
+                                : null,
+                            child: user.profilePictureUrl == null
+                                ? Text(
+                                    user.firstName?.isNotEmpty == true
+                                        ? user.firstName![0].toUpperCase()
+                                        : user.username[0].toUpperCase(),
+                                    style: TextStyle(
+                                      color: Theme.of(context).primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          title: Text(
+                            '${user.firstName ?? ''} ${user.lastName ?? ''}'
+                                    .trim()
+                                    .isEmpty
+                                ? user.username
+                                : '${user.firstName ?? ''} ${user.lastName ?? ''}'
+                                      .trim(),
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Text('@${user.username}'),
+                          activeColor: Theme.of(context).primaryColor,
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),

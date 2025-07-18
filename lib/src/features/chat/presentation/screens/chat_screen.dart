@@ -18,6 +18,9 @@ import '../../../../core/models/client_message_status.dart';
 import '../../../../core/network/connection_status/connection_status_bloc.dart';
 import '../../../../core/utils/date_helper.dart';
 import '../../../../utils/date_formatter.dart';
+import 'package:solvix/src/features/group/presentation/screens/group_info_screen.dart';
+import 'package:solvix/src/features/group/presentation/bloc/group_info_bloc.dart';
+import 'package:solvix/src/features/group/presentation/bloc/group_members_bloc.dart';
 
 class ChatScreen extends StatefulWidget {
   final ChatModel chatModel;
@@ -978,6 +981,16 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
           isDark,
           primaryColor,
         ),
+        if (chatModel.isGroup)
+          _buildActionButton(
+            context,
+            Icons.info_outline_rounded,
+            '',
+            isDesktop,
+            isDark,
+            primaryColor,
+            isGroupInfo: true,
+          ),
         SizedBox(width: isDesktop ? 12 : 8),
       ],
     );
@@ -989,8 +1002,9 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     String message,
     bool isDesktop,
     bool isDark,
-    Color primaryColor,
-  ) {
+    Color primaryColor, {
+    bool isGroupInfo = false, // ⭐ پارامتر جدید
+  }) {
     return Container(
       margin: EdgeInsets.symmetric(vertical: isDesktop ? 8 : 6),
       decoration: BoxDecoration(
@@ -1008,44 +1022,50 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         icon: Icon(icon, color: Colors.white, size: isDesktop ? 20 : 18),
         onPressed: () {
           HapticFeedback.lightImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                      Icons.info_outline_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+
+          // ⭐ اضافه کردن منطق گروه
+          if (isGroupInfo) {
+            _navigateToGroupInfo(context);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.info_outline_rounded,
+                        color: Colors.white,
+                        size: 16,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: primaryColor,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                margin: const EdgeInsets.all(16),
+                elevation: 0,
+                duration: const Duration(seconds: 2),
               ),
-              backgroundColor: primaryColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(16),
-              elevation: 0,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+            );
+          }
         },
         padding: EdgeInsets.zero,
       ),
@@ -1054,6 +1074,28 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  void _navigateToGroupInfo(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MultiBlocProvider(
+          providers: [
+            BlocProvider.value(
+              value: context.read<GroupInfoBloc>(),
+            ),
+            BlocProvider.value(
+              value: context.read<GroupMembersBloc>(),
+            ),
+          ],
+          child: GroupInfoScreen(
+            chatId: chatModel.id,
+            currentUser: _getCurrentUser(context), // helper method
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ModernMessageInput extends StatefulWidget {

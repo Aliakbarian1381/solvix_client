@@ -140,7 +140,6 @@ class GroupInfoBloc extends Bloc<GroupInfoEvent, GroupInfoState> {
       );
       if (success) {
         emit(GroupInfoUpdated('اطلاعات گروه با موفقیت به‌روزرسانی شد'));
-        // بارگذاری مجدد اطلاعات
         add(LoadGroupInfo(event.chatId));
       } else {
         emit(GroupInfoError('خطا در به‌روزرسانی اطلاعات گروه'));
