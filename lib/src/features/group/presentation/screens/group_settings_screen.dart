@@ -134,9 +134,9 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 'ویرایش اطلاعات گروه',
                 'تعیین کنید چه کسانی می‌توانند نام و توضیحات گروه را تغییر دهند',
                 Icons.edit,
-                _settings.onlyAdminsCanEditGroupInfo,
-                (value) => _updateSetting(
-                  _settings.copyWith(onlyAdminsCanEditGroupInfo: value),
+                _settings.onlyAdminsCanEditInfo,
+                    (value) => _updateSetting(
+                  _settings.copyWith(onlyAdminsCanEditInfo: value),
                 ),
               ),
             ]),

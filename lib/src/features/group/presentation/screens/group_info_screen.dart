@@ -162,13 +162,13 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               icon: const Icon(Icons.more_vert, color: Colors.white),
               itemBuilder: (context) => [
                 if (isOwner)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'delete',
                     child: Row(
                       children: [
                         Icon(Icons.delete, color: Colors.red),
                         SizedBox(width: 8),
-                        Text('حذف گروه', style: TextStyle(color: Colors.red)),
+                        Text('حذف گروه'),
                       ],
                     ),
                   ),
