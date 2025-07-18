@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 class GroupAvatar extends StatelessWidget {
   final String? imageUrl;
   final String groupName;
@@ -16,24 +19,32 @@ class GroupAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget avatar = CircleAvatar(
       radius: radius,
-      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+      backgroundColor: Theme
+          .of(context)
+          .primaryColor
+          .withOpacity(0.1),
       backgroundImage: imageUrl != null
           ? CachedNetworkImageProvider(imageUrl!)
           : null,
       child: imageUrl == null
           ? Text(
-              groupName.isNotEmpty ? groupName[0].toUpperCase() : 'G',
-              style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.bold,
-                fontSize: radius * 0.6,
-              ),
-            )
+        groupName.isNotEmpty ? groupName[0].toUpperCase() : 'G',
+        style: TextStyle(
+          color: Theme
+              .of(context)
+              .primaryColor,
+          fontWeight: FontWeight.bold,
+          fontSize: radius * 0.6,
+        ),
+      )
           : null,
     );
 
     if (onTap != null) {
-      return GestureDetector(onTap: onTap, child: avatar);
+      return GestureDetector(
+        onTap: onTap,
+        child: avatar,
+      );
     }
 
     return avatar;

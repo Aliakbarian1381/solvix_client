@@ -1,3 +1,8 @@
+import 'package:flutter/material.dart';
+import 'package:solvix/src/core/models/group_info_model.dart';
+import 'package:solvix/src/features/group/presentation/widgets/group_avatar.dart';
+import 'package:solvix/src/features/group/presentation/widgets/role_badge.dart';
+
 class MemberTile extends StatelessWidget {
   final GroupMemberModel member;
   final bool isCurrentUser;

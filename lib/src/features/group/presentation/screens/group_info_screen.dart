@@ -4,9 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:solvix/src/core/models/group_info_model.dart';
 import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_info_bloc.dart';
-import 'package:solvix/src/features/group/presentation/screens/group_members_screen.dart';
-import 'package:solvix/src/features/group/presentation/screens/group_settings_screen.dart';
-import 'package:solvix/src/features/group/presentation/screens/edit_group_screen.dart';
 
 class GroupInfoScreen extends StatefulWidget {
   final String chatId;

@@ -1,7 +1,7 @@
 name: solvix
 description: "Solvix Messanger."
 publish_to: 'none'
-version: 1.0.1+1
+version: 1.0.0+1
 
 
 environment:
@@ -40,6 +40,8 @@ dependencies:
   flutter_animate: ^4.5.2
   connectivity_plus: ^6.1.4
   dio: ^5.8.0+1
+  image_picker: ^1.1.2
+  geolocator: ^14.0.2
 
 
 dev_dependencies:
@@ -49,6 +51,8 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   hive_generator: ^2.0.0
   build_runner: ^2.3.3
+
+
 
 dependency_overrides:
   web_socket_channel: ^3.0.3
@@ -71,3 +75,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/lottie/
+
+
+

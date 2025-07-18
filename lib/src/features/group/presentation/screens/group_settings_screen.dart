@@ -41,10 +41,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           if (_hasChanges)
             TextButton(
               onPressed: _saveSettings,
-              child: const Text(
-                'ذخیره',
-                style: TextStyle(color: Colors.white),
-              ),
+              child: const Text('ذخیره', style: TextStyle(color: Colors.white)),
             ),
         ],
       ),
@@ -92,10 +89,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                           SizedBox(height: 4),
                           Text(
                             'این تنظیمات تعیین می‌کند چه کسانی چه عملیاتی را می‌توانند انجام دهند',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -108,66 +102,51 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             const SizedBox(height: 16),
 
             // Messages Settings
-            _buildSettingsCard(
-              context,
-              'مجوزهای پیام‌رسانی',
-              [
-                _buildSettingTile(
-                  context,
-                  'ارسال پیام',
-                  'تعیین کنید چه کسانی می‌توانند در گروه پیام بفرستند',
-                  Icons.message,
-                  _settings.onlyAdminsCanSendMessages,
-                      (value) =>
-                      _updateSetting(
-                        _settings.copyWith(onlyAdminsCanSendMessages: value),
-                      ),
+            _buildSettingsCard(context, 'مجوزهای پیام‌رسانی', [
+              _buildSettingTile(
+                context,
+                'ارسال پیام',
+                'تعیین کنید چه کسانی می‌توانند در گروه پیام بفرستند',
+                Icons.message,
+                _settings.onlyAdminsCanSendMessages,
+                (value) => _updateSetting(
+                  _settings.copyWith(onlyAdminsCanSendMessages: value),
                 ),
-              ],
-            ),
+              ),
+            ]),
 
             const SizedBox(height: 16),
 
             // Members Management Settings
-            _buildSettingsCard(
-              context,
-              'مدیریت اعضا',
-              [
-                _buildSettingTile(
-                  context,
-                  'اضافه کردن عضو',
-                  'تعیین کنید چه کسانی می‌توانند عضو جدید اضافه کنند',
-                  Icons.person_add,
-                  _settings.onlyAdminsCanAddMembers,
-                      (value) =>
-                      _updateSetting(
-                        _settings.copyWith(onlyAdminsCanAddMembers: value),
-                      ),
+            _buildSettingsCard(context, 'مدیریت اعضا', [
+              _buildSettingTile(
+                context,
+                'اضافه کردن عضو',
+                'تعیین کنید چه کسانی می‌توانند عضو جدید اضافه کنند',
+                Icons.person_add,
+                _settings.onlyAdminsCanAddMembers,
+                (value) => _updateSetting(
+                  _settings.copyWith(onlyAdminsCanAddMembers: value),
                 ),
-                _buildSettingTile(
-                  context,
-                  'ویرایش اطلاعات گروه',
-                  'تعیین کنید چه کسانی می‌توانند نام و توضیحات گروه را تغییر دهند',
-                  Icons.edit,
-                  _settings.onlyAdminsCanEditGroupInfo,
-                      (value) =>
-                      _updateSetting(
-                        _settings.copyWith(onlyAdminsCanEditGroupInfo: value),
-                      ),
+              ),
+              _buildSettingTile(
+                context,
+                'ویرایش اطلاعات گروه',
+                'تعیین کنید چه کسانی می‌توانند نام و توضیحات گروه را تغییر دهند',
+                Icons.edit,
+                _settings.onlyAdminsCanEditGroupInfo,
+                (value) => _updateSetting(
+                  _settings.copyWith(onlyAdminsCanEditGroupInfo: value),
                 ),
-              ],
-            ),
+              ),
+            ]),
 
             const SizedBox(height: 16),
 
             // Group Limits
-            _buildSettingsCard(
-              context,
-              'محدودیت‌ها',
-              [
-                _buildMaxMembersSlider(context),
-              ],
-            ),
+            _buildSettingsCard(context, 'محدودیت‌ها', [
+              _buildMaxMembersSlider(context),
+            ]),
 
             const SizedBox(height: 32),
 
@@ -186,10 +165,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                   Expanded(
                     child: Text(
                       'تغییرات تنظیمات بلافاصله بر روی تمام اعضای گروه اعمال می‌شود. فقط مالک و ادمین‌های گروه می‌توانند این تنظیمات را تغییر دهند.',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.blue, fontSize: 14),
                     ),
                   ),
                 ],
@@ -201,8 +177,11 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     );
   }
 
-  Widget _buildSettingsCard(BuildContext context, String title,
-      List<Widget> children) {
+  Widget _buildSettingsCard(
+    BuildContext context,
+    String title,
+    List<Widget> children,
+  ) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -211,10 +190,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...children,
@@ -224,12 +200,14 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     );
   }
 
-  Widget _buildSettingTile(BuildContext context,
-      String title,
-      String subtitle,
-      IconData icon,
-      bool value,
-      Function(bool) onChanged,) {
+  Widget _buildSettingTile(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    bool value,
+    Function(bool) onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -237,19 +215,10 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Theme
-                  .of(context)
-                  .primaryColor
-                  .withOpacity(0.1),
+              color: Theme.of(context).primaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: Theme
-                  .of(context)
-                  .primaryColor,
-            ),
+            child: Icon(icon, size: 20, color: Theme.of(context).primaryColor),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -265,10 +234,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -276,9 +242,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Theme
-                .of(context)
-                .primaryColor,
+            activeColor: Theme.of(context).primaryColor,
           ),
         ],
       ),
@@ -294,18 +258,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme
-                    .of(context)
-                    .primaryColor
-                    .withOpacity(0.1),
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 Icons.groups,
                 size: 20,
-                color: Theme
-                    .of(context)
-                    .primaryColor,
+                color: Theme.of(context).primaryColor,
               ),
             ),
             const SizedBox(width: 12),
@@ -322,10 +281,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                   ),
                   Text(
                     'تعیین کنید حداکثر چند نفر می‌توانند عضو این گروه باشند',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -335,16 +291,9 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         const SizedBox(height: 16),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: Theme
-                .of(context)
-                .primaryColor,
-            thumbColor: Theme
-                .of(context)
-                .primaryColor,
-            overlayColor: Theme
-                .of(context)
-                .primaryColor
-                .withOpacity(0.2),
+            activeTrackColor: Theme.of(context).primaryColor,
+            thumbColor: Theme.of(context).primaryColor,
+            overlayColor: Theme.of(context).primaryColor.withOpacity(0.2),
           ),
           child: Slider(
             value: _settings.maxMembers.toDouble(),
@@ -370,10 +319,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
   void _saveSettings() {
     context.read<GroupInfoBloc>().add(
-      UpdateGroupSettings(
-        chatId: widget.chatId,
-        settings: _settings,
-      ),
+      UpdateGroupSettings(chatId: widget.chatId, settings: _settings),
     );
   }
 }
@@ -404,7 +350,7 @@ extension GroupRoleExtension on GroupRole {
   IconData get icon {
     switch (this) {
       case GroupRole.owner:
-        return Icons.crown;
+        return Icons.star;
       case GroupRole.admin:
         return Icons.admin_panel_settings;
       case GroupRole.member:

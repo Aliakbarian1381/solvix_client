@@ -4,7 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:solvix/src/core/models/group_info_model.dart';
 import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_members_bloc.dart';
-import 'package:solvix/src/features/contacts/presentation/screens/contacts_screen.dart';
+import 'package:solvix/src/features/group/presentation/widgets/group_avatar.dart';
+import 'package:solvix/src/features/group/presentation/widgets/role_badge.dart';
 
 class GroupMembersScreen extends StatefulWidget {
   final String chatId;
@@ -546,8 +547,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
     final currentMember = widget.groupInfo.members.firstWhere(
           (member) => member.userId == widget.currentUser!.id,
-      orElse: () =>
-      const GroupMemberModel(
+      orElse: () => GroupMemberModel(
         userId: -1,
         username: '',
         role: GroupRole.member,
