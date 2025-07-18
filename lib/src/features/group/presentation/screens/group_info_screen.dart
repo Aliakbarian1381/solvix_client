@@ -4,6 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:solvix/src/core/models/group_info_model.dart';
 import 'package:solvix/src/core/models/user_model.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_info_bloc.dart';
+import 'package:solvix/src/features/group/presentation/screens/group_members_screen.dart';
+import 'package:solvix/src/features/group/presentation/screens/group_settings_screen.dart';
+import 'package:solvix/src/features/group/presentation/screens/edit_group_screen.dart';
 
 class GroupInfoScreen extends StatefulWidget {
   final String chatId;
@@ -642,16 +645,16 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     );
   }
 
-  GroupRole? _getCurrentUserRole(GroupInfoModel groupInfo) {
-    if (widget.currentUser == null) return null;
+  GroupRole? _getCurrentUserRole(GroupInfoModel groupInfo, UserModel? currentUser) {
+    if (currentUser == null) return null;
 
     final currentMember = groupInfo.members.firstWhere(
-      (member) => member.userId == widget.currentUser!.id,
-      orElse: () => const GroupMemberModel(
+          (member) => member.userId == currentUser.id,
+      orElse: () => GroupMemberModel(
         userId: -1,
         username: '',
         role: GroupRole.member,
-        joinedAt: null,
+        joinedAt: DateTime.now(),
         isOnline: false,
       ),
     );

@@ -28,6 +28,9 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'firebase_options.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:solvix/src/core/api/group_service.dart';
+import 'package:solvix/src/features/group/presentation/bloc/group_info_bloc.dart';
+import 'package:solvix/src/features/group/presentation/bloc/group_members_bloc.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -106,6 +109,12 @@ Future<void> main() async {
           BlocProvider<ConnectionStatusBloc>(
             create: (context) => ConnectionStatusBloc(signalRService),
             lazy: false,
+          ),
+          BlocProvider<GroupInfoBloc>(
+            create: (context) => GroupInfoBloc(GroupService(context.read<StorageService>())),
+          ),
+          BlocProvider<GroupMembersBloc>(
+            create: (context) => GroupMembersBloc(GroupService(context.read<StorageService>())),
           ),
           BlocProvider<AppBloc>(
             create: (context) => AppBloc(

@@ -255,8 +255,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         trailing: canManage
             ? PopupMenuButton<String>(
           onSelected: (value) => _handleMemberAction(context, value, member),
-          itemBuilder: (context) =>
-          [
+          itemBuilder: (context) => [
             if (member.role == GroupRole.member && isOwner)
               const PopupMenuItem(
                 value: 'promote_admin',
@@ -284,7 +283,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 value: 'transfer_ownership',
                 child: Row(
                   children: [
-                    Icon(Icons.crown, color: Colors.amber),
+                    Icon(Icons.star, color: Colors.amber), // ⭐ تغییر از crown به star
                     SizedBox(width: 8),
                     Text('انتقال مالکیت'),
                   ],
@@ -316,7 +315,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       case GroupRole.owner:
         color = Colors.amber;
         text = 'مالک';
-        icon = Icons.crown;
+        icon = Icons.star; // ⭐ تغییر از crown به star
         break;
       case GroupRole.admin:
         color = Colors.blue;
