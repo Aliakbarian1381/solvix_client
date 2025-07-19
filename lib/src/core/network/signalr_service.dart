@@ -285,6 +285,49 @@ class SignalRService {
         _logger.warning('SignalR: Received error from Hub: $errorMessage');
       }
     });
+
+    _hubConnection!.on('MemberAdded', (List<Object?>? arguments) {
+      if (arguments != null && arguments.length >= 2) {
+        final chatId = arguments[0] as String?;
+        final newMemberId = arguments[1] as int?;
+        _logger.info('SignalR: Member added to group: ChatID: $chatId, MemberID: $newMemberId');
+        // اطلاع‌رسانی به UI
+      }
+    });
+
+    _hubConnection!.on('MemberRemoved', (List<Object?>? arguments) {
+      if (arguments != null && arguments.length >= 2) {
+        final chatId = arguments[0] as String?;
+        final removedMemberId = arguments[1] as int?;
+        _logger.info('SignalR: Member removed from group: ChatID: $chatId, MemberID: $removedMemberId');
+      }
+    });
+
+    _hubConnection!.on('MemberLeft', (List<Object?>? arguments) {
+      if (arguments != null && arguments.length >= 2) {
+        final chatId = arguments[0] as String?;
+        final leftMemberId = arguments[1] as int?;
+        _logger.info('SignalR: Member left group: ChatID: $chatId, MemberID: $leftMemberId');
+      }
+    });
+
+    _hubConnection!.on('MemberRoleChanged', (List<Object?>? arguments) {
+      if (arguments != null && arguments.length >= 3) {
+        final chatId = arguments[0] as String?;
+        final memberId = arguments[1] as int?;
+        final newRole = arguments[2] as String?;
+        _logger.info('SignalR: Member role changed: ChatID: $chatId, MemberID: $memberId, NewRole: $newRole');
+      }
+    });
+
+    _hubConnection!.on('GroupLeft', (List<Object?>? arguments) {
+      if (arguments != null && arguments.isNotEmpty) {
+        final chatId = arguments[0] as String?;
+        _logger.info('SignalR: Successfully left group: $chatId');
+        // بازگشت به صفحه قبل
+      }
+    });
+
     _logger.info('SignalR: Server-to-client event handlers registered.');
   }
 
@@ -337,6 +380,20 @@ class SignalRService {
     } catch (e) {
       _logger.severe('SignalR: Error leaving group: $e');
       throw Exception('Failed to leave chat group: $e');
+    }
+  }
+
+  Future<void> leaveGroupChat(String chatId) async {
+    if (!isConnected || _hubConnection == null) {
+      _logger.warning('SignalR: Cannot leave group chat: Not connected.');
+      throw Exception('SignalR not connected');
+    }
+    try {
+      await _hubConnection!.invoke('LeaveGroupChat', args: [chatId]);
+      _logger.info('SignalR: Left group chat: $chatId');
+    } catch (e) {
+      _logger.severe('SignalR: Error leaving group chat: $e');
+      throw Exception('Failed to leave group chat: $e');
     }
   }
 
