@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
+
+// import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:solvix/src/core/models/group_info_model.dart';
 import 'package:solvix/src/features/group/presentation/bloc/group_info_bloc.dart';
@@ -25,7 +26,8 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
   late TextEditingController _descriptionController;
   File? _selectedImage;
   bool _hasChanges = false;
-  final ImagePicker _imagePicker = ImagePicker();
+
+  // final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -131,14 +133,16 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
             const SizedBox(height: 16),
             Center(
               child: GestureDetector(
-                onTap: _pickImage,
+                // onTap: _pickImage,
                 child: Stack(
                   children: [
                     CircleAvatar(
                       radius: 50,
                       backgroundColor: Colors.grey[200],
                       backgroundImage: widget.groupInfo.avatarUrl != null
-                          ? CachedNetworkImageProvider(widget.groupInfo.avatarUrl!)
+                          ? CachedNetworkImageProvider(
+                              widget.groupInfo.avatarUrl!,
+                            )
                           : null,
                     ),
                     Positioned(
@@ -268,7 +272,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
     return null;
   }
 
-  Future<void> _pickImage() async {
+  /*Future<void> _pickImage() async {
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -311,9 +315,10 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
         ),
       ),
     );
-  }
+*/
+  // }
 
-  Future<void> _getImageFromSource(ImageSource source) async {
+  /*Future<void> _getImageFromSource(ImageSource source) async {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: source,
@@ -336,7 +341,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
       }
     }
   }
-
+*/
   void _saveChanges() {
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -3,10 +3,8 @@ description: "Solvix Messanger."
 publish_to: 'none'
 version: 1.0.0+1
 
-
 environment:
   sdk: ^3.8.1
-
 
 dependencies:
   flutter:
@@ -40,10 +38,7 @@ dependencies:
   flutter_animate: ^4.5.2
   connectivity_plus: ^6.1.4
   dio: ^5.8.0+1
-  image_picker: ^1.0.4
-#  geolocator: ^14.0.2
   cached_network_image: ^3.4.1
-
 
 dev_dependencies:
   flutter_test:
@@ -53,21 +48,16 @@ dev_dependencies:
   hive_generator: ^2.0.0
   build_runner: ^2.3.3
 
-
-
 dependency_overrides:
   web_socket_channel: ^3.0.3
   web: ^1.1.1
   material_color_utilities: 0.13.0
   meta: 1.17.0
 
-
-
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icon/icon.png"
-
   web:
     generate: true
     image_path: "assets/icon/icon.png"
@@ -104,6 +94,3 @@ flutter:
           weight: 700
         - asset: assets/fonts/Inter-ExtraBold.ttf
           weight: 800
-
-
-

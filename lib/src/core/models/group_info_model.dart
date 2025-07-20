@@ -1,31 +1,48 @@
 import 'package:equatable/equatable.dart';
 
-enum GroupRole { owner, admin, member }
+enum GroupRole { member, admin, owner }
 
 class GroupInfoModel extends Equatable {
   final String id;
   final String title;
   final String? description;
   final String? avatarUrl;
-  final String ownerName;
-  final int ownerId;
-  final DateTime createdAt;
   final int membersCount;
   final List<GroupMemberModel> members;
   final GroupSettingsModel settings;
+  final DateTime createdAt;
+  final int? ownerId;
+  final String? ownerName; // اضافه شد
 
   const GroupInfoModel({
     required this.id,
     required this.title,
     this.description,
     this.avatarUrl,
-    required this.ownerName,
-    required this.ownerId,
-    required this.createdAt,
     required this.membersCount,
     required this.members,
     required this.settings,
+    required this.createdAt,
+    this.ownerId,
+    this.ownerName, // اضافه شد
   });
+
+  // اضافه کردن getter برای پیدا کردن owner از بین members
+  GroupMemberModel? get owner {
+    try {
+      return members.firstWhere((member) => member.role == GroupRole.owner);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // اضافه کردن getter برای نام مالک
+  String get displayOwnerName {
+    if (ownerName != null) return ownerName!;
+    final ownerMember = owner;
+    if (ownerMember != null) return ownerMember.displayName;
+    return 'نامشخص';
+  }
 
   factory GroupInfoModel.fromJson(Map<String, dynamic> json) {
     return GroupInfoModel(
@@ -33,22 +50,21 @@ class GroupInfoModel extends Equatable {
       title: json['title'] as String,
       description: json['description'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
-      ownerName: json['ownerName'] as String,
-      ownerId: json['ownerId'] as int,
-      createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       membersCount: json['membersCount'] as int,
       members:
           (json['members'] as List<dynamic>?)
               ?.map(
-                (memberJson) => GroupMemberModel.fromJson(
-                  memberJson as Map<String, dynamic>,
-                ),
+                (member) =>
+                    GroupMemberModel.fromJson(member as Map<String, dynamic>),
               )
               .toList() ??
           [],
       settings: GroupSettingsModel.fromJson(
         json['settings'] as Map<String, dynamic>,
       ),
+      createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+      ownerId: json['ownerId'] as int?,
+      ownerName: json['ownerName'] as String?, // اضافه شد
     );
   }
 
@@ -58,12 +74,12 @@ class GroupInfoModel extends Equatable {
       'title': title,
       'description': description,
       'avatarUrl': avatarUrl,
-      'ownerName': ownerName,
-      'ownerId': ownerId,
-      'createdAt': createdAt.toIso8601String(),
       'membersCount': membersCount,
       'members': members.map((member) => member.toJson()).toList(),
       'settings': settings.toJson(),
+      'createdAt': createdAt.toIso8601String(),
+      'ownerId': ownerId,
+      'ownerName': ownerName, // اضافه شد
     };
   }
 
@@ -73,12 +89,12 @@ class GroupInfoModel extends Equatable {
     title,
     description,
     avatarUrl,
-    ownerName,
-    ownerId,
-    createdAt,
     membersCount,
     members,
     settings,
+    createdAt,
+    ownerId,
+    ownerName, // اضافه شد
   ];
 }
 
@@ -120,7 +136,6 @@ class GroupMemberModel extends Equatable {
     return GroupMemberModel(
       id: json['id'] as int,
       userId: json['userId'] as int? ?? json['id'] as int,
-      // fallback
       username: json['username'] as String,
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
@@ -197,12 +212,9 @@ class GroupSettingsModel extends Equatable {
           json['onlyAdminsCanSendMessages'] as bool? ?? false,
       onlyAdminsCanAddMembers:
           json['onlyAdminsCanAddMembers'] as bool? ?? false,
-      onlyAdminsCanEditInfo:
-          json['onlyAdminsCanEditInfo'] as bool? ??
-          json['onlyAdminsCanEditGroupInfo'] as bool? ??
-          true,
+      onlyAdminsCanEditInfo: json['onlyAdminsCanEditInfo'] as bool? ?? true,
       onlyAdminsCanDeleteMessages:
-          json['onlyAdminsCanDeleteMessages'] as bool? ?? true,
+          json['onlyAdminsCanDeleteMessages'] as bool? ?? false,
       allowMemberToLeave: json['allowMemberToLeave'] as bool? ?? true,
       isPublic: json['isPublic'] as bool? ?? false,
       joinLink: json['joinLink'] as String?,
@@ -222,6 +234,7 @@ class GroupSettingsModel extends Equatable {
     };
   }
 
+  // اضافه کردن copyWith method
   GroupSettingsModel copyWith({
     int? maxMembers,
     bool? onlyAdminsCanSendMessages,

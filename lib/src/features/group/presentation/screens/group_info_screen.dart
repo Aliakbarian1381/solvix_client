@@ -240,7 +240,10 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     );
   }
 
-  Widget _buildHeaderBackground(BuildContext context, GroupInfoModel groupInfo) {
+  Widget _buildHeaderBackground(
+    BuildContext context,
+    GroupInfoModel groupInfo,
+  ) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -254,11 +257,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       ),
       child: Stack(
         children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _PatternPainter(),
-            ),
-          ),
+          Positioned.fill(child: CustomPaint(painter: _PatternPainter())),
           Center(
             child: Hero(
               tag: 'group_avatar_${groupInfo.id}',
@@ -442,7 +441,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildInfoRow('شناسه گروه', groupInfo.id),
-                _buildInfoRow('مالک گروه', groupInfo.ownerName),
+                _buildInfoRow('مالک گروه', groupInfo.displayOwnerName),
                 _buildInfoRow('تاریخ ایجاد', _formatDate(groupInfo.createdAt)),
                 _buildInfoRow('تعداد اعضا', '${groupInfo.membersCount} نفر'),
                 _buildInfoRow(
