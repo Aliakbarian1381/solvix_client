@@ -809,7 +809,7 @@ class _ModernChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         Color subtitleColor;
         IconData? subtitleIcon;
 
-        if (state.signalRStatus == SignalRConnectionStatus.Connected) {
+        if (state.signalRStatus == SignalRConnectionStatus.connected) {
           subtitleText = _getParticipantStatusSubtitle();
           subtitleColor = isDark ? Colors.white60 : Colors.black54;
           subtitleIcon = null;

@@ -1,3 +1,4 @@
+// lib/src/core/network/connection_status/connection_status_state.dart
 part of 'connection_status_bloc.dart';
 
 class ConnectionStatusState extends Equatable {
@@ -5,7 +6,7 @@ class ConnectionStatusState extends Equatable {
   final ConnectivityResult connectivityStatus;
 
   const ConnectionStatusState({
-    this.signalRStatus = SignalRConnectionStatus.Disconnected,
+    this.signalRStatus = SignalRConnectionStatus.disconnected,
     this.connectivityStatus = ConnectivityResult.none,
   });
 

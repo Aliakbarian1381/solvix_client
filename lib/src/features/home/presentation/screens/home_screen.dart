@@ -1122,7 +1122,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Color titleColor = isDark ? Colors.white : Colors.black87;
           IconData? titleIcon;
 
-          if (state.signalRStatus != SignalRConnectionStatus.Connected) {
+          if (state.signalRStatus != SignalRConnectionStatus.connected) {
             if (state.connectivityStatus == ConnectivityResult.none) {
               titleText = "آفلاین";
               titleColor = Colors.grey.shade500;

@@ -1,168 +1,245 @@
-/*
+// lib/src/core/theme/theme_cubit.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_theme.dart';
 
 class ThemeCubit extends Cubit<ThemeData> {
   static const String _themeKey = 'app_theme';
+  static const Duration _saveDebounceDuration = Duration(milliseconds: 500);
+
+  final Logger _logger = Logger('ThemeCubit');
+  Timer? _saveTimer;
+  SharedPreferences? _prefs;
+  AppTheme _currentTheme = AppTheme.light;
 
   ThemeCubit() : super(AppThemes.getThemeData(AppTheme.light)) {
-    _loadTheme();
+    _initializeTheme();
   }
 
-  // بارگذاری تم ذخیره شده از حافظه
-  Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    final themeName = prefs.getString(_themeKey) ?? AppTheme.light.name;
-    final appTheme = AppTheme.values.firstWhere(
-      (e) => e.name == themeName,
-      orElse: () => AppTheme.light,
-    );
-    emit(AppThemes.getThemeData(appTheme));
-  }
-
-  // تغییر و ذخیره تم جدید
-  Future<void> changeTheme(AppTheme theme) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_themeKey, theme.name);
-    emit(AppThemes.getThemeData(theme));
-  }
-}
-*/
-
-
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'app_theme.dart';
-
-class ThemeCubit extends Cubit<ThemeData> {
-  static const String _themeKey = 'app_theme';
-
-  ThemeCubit() : super(AppThemes.getThemeData(AppTheme.light)) {
-    _loadThemeAsync();
-  }
-
-  // async method که خطاها رو handle میکنه
-  void _loadThemeAsync() async {
+  // ✅ Fix 1: بهبود initialization با proper error handling
+  Future<void> _initializeTheme() async {
     try {
-      await _loadTheme();
-    } catch (e) {
-      print('Error loading theme, using default: $e');
-      // اگر خطا بود، cleanup کن و default theme رو استفاده کن
-      await _cleanupCorruptedData();
+      _prefs = await SharedPreferences.getInstance();
+      await _loadSavedTheme();
+      _logger.info(
+        'ThemeCubit initialized successfully with theme: $_currentTheme',
+      );
+    } catch (e, stack) {
+      _logger.severe('Error initializing ThemeCubit: $e', e, stack);
+      // در صورت خطا، از تم پیش‌فرض استفاده می‌کنیم
+      await _setDefaultTheme();
     }
   }
 
-  // بارگذاری تم ذخیره شده از حافظه
-  Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // اول چک کن که آیا key وجود داره یا نه
-    if (!prefs.containsKey(_themeKey)) {
-      // اگر key وجود نداره، default رو ذخیره کن
-      await prefs.setString(_themeKey, AppTheme.light.name);
+  // ✅ Fix 2: بهبود theme loading
+  Future<void> _loadSavedTheme() async {
+    if (_prefs == null) {
+      _logger.warning('SharedPreferences not initialized');
       return;
     }
 
-    // value رو با try-catch بگیر
-    String? themeName;
     try {
-      themeName = prefs.getString(_themeKey);
-    } catch (e) {
-      print('Error getting theme string: $e');
-      // اگر getString fail کرد، cleanup کن
-      await _cleanupCorruptedData();
-      return;
-    }
+      // بررسی وجود کلید
+      if (!_prefs!.containsKey(_themeKey)) {
+        _logger.info('No saved theme found, using default');
+        await _setDefaultTheme();
+        return;
+      }
 
-    // اگر themeName null یا empty بود
-    if (themeName == null || themeName.isEmpty) {
-      await prefs.setString(_themeKey, AppTheme.light.name);
-      return;
-    }
+      // خواندن تم ذخیره شده
+      final themeName = _prefs!.getString(_themeKey);
+      if (themeName == null || themeName.isEmpty) {
+        _logger.warning('Invalid theme name saved, using default');
+        await _setDefaultTheme();
+        return;
+      }
 
-    // سعی کن theme رو پیدا کنی
-    try {
-      final appTheme = AppTheme.values.firstWhere(
-            (e) => e.name == themeName,
+      // پیدا کردن تم از enum
+      final savedTheme = AppTheme.values.firstWhere(
+        (theme) => theme.name == themeName,
         orElse: () => AppTheme.light,
       );
-      emit(AppThemes.getThemeData(appTheme));
-    } catch (e) {
-      print('Error finding theme enum: $e');
+
+      if (savedTheme.name != themeName) {
+        _logger.warning('Unknown theme name: $themeName, using default');
+        await _setDefaultTheme();
+        return;
+      }
+
+      // اعمال تم
+      _currentTheme = savedTheme;
+      emit(AppThemes.getThemeData(savedTheme));
+      _logger.info('Loaded saved theme: $savedTheme');
+    } catch (e, stack) {
+      _logger.severe('Error loading saved theme: $e', e, stack);
       await _cleanupCorruptedData();
     }
   }
 
-  // پاک کردن داده‌های خراب
-  Future<void> _cleanupCorruptedData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // تمام key های مرتبط با theme رو حذف کن
-      await prefs.remove(_themeKey);
-
-      // اگر key های دیگه ای هم هست که ممکنه مشکل ساز باشه
-      // مثلاً اگر قبلاً theme رو به صورت bool یا int ذخیره کرده باشه
-      final keys = prefs.getKeys();
-      for (String key in keys) {
-        if (key.contains('theme') || key.contains('Theme')) {
-          try {
-            // چک کن که value چه نوعیه
-            final value = prefs.get(key);
-            if (value is! String) {
-              print('Found non-string theme value: $key = $value (${value.runtimeType})');
-              await prefs.remove(key);
-            }
-          } catch (e) {
-            print('Error checking key $key: $e');
-            await prefs.remove(key);
-          }
-        }
-      }
-
-      // default theme رو ذخیره کن
-      await prefs.setString(_themeKey, AppTheme.light.name);
-
-      print('Theme cleanup completed, using default light theme');
-    } catch (e) {
-      print('Error during cleanup: $e');
-    }
-  }
-
-  // تغییر و ذخیره تم جدید
+  // ✅ Fix 3: بهبود theme changing با debouncing
   Future<void> changeTheme(AppTheme theme) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_themeKey, theme.name);
+      // بررسی تغییر واقعی
+      if (_currentTheme == theme) {
+        _logger.fine('Theme already set to: $theme');
+        return;
+      }
+
+      _logger.info('Changing theme from $_currentTheme to $theme');
+
+      // تغییر فوری UI
+      _currentTheme = theme;
       emit(AppThemes.getThemeData(theme));
-    } catch (e) {
-      print('Error saving theme: $e');
-      // حتی اگر save نشه، theme رو عوض کن
-      emit(AppThemes.getThemeData(theme));
+
+      // ذخیره با debouncing (جلوگیری از writes متعدد)
+      _scheduleSave();
+    } catch (e, stack) {
+      _logger.severe('Error changing theme: $e', e, stack);
+      // در صورت خطا، به تم قبلی برمی‌گردیم
+      emit(AppThemes.getThemeData(_currentTheme));
     }
   }
 
-  // یه method برای debug کردن تمام shared preferences
-  Future<void> debugSharedPreferences() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final keys = prefs.getKeys();
+  // ✅ Fix 4: Debounced save mechanism
+  void _scheduleSave() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(_saveDebounceDuration, () async {
+      await _saveThemeToStorage();
+    });
+  }
 
-      print('=== SharedPreferences Debug ===');
-      for (String key in keys) {
-        try {
-          final value = prefs.get(key);
-          print('$key: $value (${value.runtimeType})');
-        } catch (e) {
-          print('$key: ERROR - $e');
-        }
-      }
-      print('=== End Debug ===');
-    } catch (e) {
-      print('Error debugging SharedPreferences: $e');
+  Future<void> _saveThemeToStorage() async {
+    if (_prefs == null) {
+      _logger.warning('Cannot save theme: SharedPreferences not initialized');
+      return;
     }
+
+    try {
+      await _prefs!.setString(_themeKey, _currentTheme.name);
+      _logger.fine('Theme saved to storage: $_currentTheme');
+    } catch (e, stack) {
+      _logger.severe('Error saving theme to storage: $e', e, stack);
+    }
+  }
+
+  // ✅ Fix 5: بهبود default theme setting
+  Future<void> _setDefaultTheme() async {
+    try {
+      _currentTheme = AppTheme.light;
+      emit(AppThemes.getThemeData(AppTheme.light));
+
+      if (_prefs != null) {
+        await _prefs!.setString(_themeKey, AppTheme.light.name);
+      }
+
+      _logger.info('Default theme set and saved');
+    } catch (e, stack) {
+      _logger.severe('Error setting default theme: $e', e, stack);
+    }
+  }
+
+  // ✅ Fix 6: Cleanup corrupted data
+  Future<void> _cleanupCorruptedData() async {
+    try {
+      _logger.info('Cleaning up corrupted theme data');
+
+      if (_prefs != null) {
+        await _prefs!.remove(_themeKey);
+      }
+
+      await _setDefaultTheme();
+      _logger.info('Corrupted data cleaned up successfully');
+    } catch (e, stack) {
+      _logger.severe('Error cleaning up corrupted data: $e', e, stack);
+    }
+  }
+
+  // ✅ Fix 7: Reset theme to default
+  Future<void> resetToDefault() async {
+    try {
+      _logger.info('Resetting theme to default');
+      await changeTheme(AppTheme.light);
+    } catch (e, stack) {
+      _logger.severe('Error resetting theme: $e', e, stack);
+    }
+  }
+
+  // ✅ Fix 8: Cycle through available themes
+  Future<void> cycleTheme() async {
+    try {
+      final currentIndex = AppTheme.values.indexOf(_currentTheme);
+      final nextIndex = (currentIndex + 1) % AppTheme.values.length;
+      final nextTheme = AppTheme.values[nextIndex];
+
+      _logger.info('Cycling theme: $_currentTheme -> $nextTheme');
+      await changeTheme(nextTheme);
+    } catch (e, stack) {
+      _logger.severe('Error cycling theme: $e', e, stack);
+    }
+  }
+
+  // ✅ Fix 9: Check if theme is available
+  bool isThemeAvailable(AppTheme theme) {
+    return AppTheme.values.contains(theme);
+  }
+
+  // ✅ Fix 10: Get current theme info
+  AppTheme get currentTheme => _currentTheme;
+
+  String get currentThemeName => _currentTheme.name;
+
+  List<AppTheme> get availableThemes => AppTheme.values;
+
+  // ✅ Fix 11: Force refresh theme
+  Future<void> refreshTheme() async {
+    try {
+      _logger.info('Refreshing current theme: $_currentTheme');
+      emit(AppThemes.getThemeData(_currentTheme));
+    } catch (e, stack) {
+      _logger.severe('Error refreshing theme: $e', e, stack);
+    }
+  }
+
+  // ✅ Fix 12: Improved close method
+  @override
+  Future<void> close() async {
+    _logger.info('Closing ThemeCubit');
+
+    // Cancel pending save operations
+    _saveTimer?.cancel();
+    _saveTimer = null;
+
+    // Force save current theme before closing
+    if (_prefs != null) {
+      try {
+        await _saveThemeToStorage();
+        _logger.info('Final theme save completed');
+      } catch (e) {
+        _logger.warning('Error in final theme save: $e');
+      }
+    }
+
+    _prefs = null;
+    _logger.info('ThemeCubit closed successfully');
+
+    return super.close();
+  }
+
+  // ✅ Debug methods
+  Map<String, dynamic> getDebugInfo() {
+    return {
+      'currentTheme': _currentTheme.name,
+      'hasPendingSave': _saveTimer != null,
+      'prefsInitialized': _prefs != null,
+      'availableThemes': AppTheme.values.map((t) => t.name).toList(),
+    };
+  }
+
+  void logDebugInfo() {
+    final info = getDebugInfo();
+    _logger.info('ThemeCubit Debug Info: $info');
   }
 }
